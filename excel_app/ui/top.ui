@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1099</width>
+    <height>842</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QWidget" name="">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>30</y>
+      <width>941</width>
+      <height>261</height>
+     </rect>
+    </property>
+    <layout class="QHBoxLayout" name="horizontalLayout_5">
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_3">
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_6">
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_4">
+           <item>
+            <widget class="QLineEdit" name="SelectPathLineEdit"/>
+           </item>
+           <item>
+            <widget class="QPushButton" name="SelectNeedDataAnalysisDirButton">
+             <property name="text">
+              <string>选择</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_10">
+         <item>
+          <layout class="QVBoxLayout" name="ReruleBox">
+           <item>
+            <widget class="QLineEdit" name="ReruleLineEdit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="FilterColNameBox">
+           <item>
+            <widget class="QLineEdit" name="FilterColNameLineEdit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="keyWord_3">
+           <item>
+            <widget class="QLineEdit" name="SumColNameLineEdit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="HeaderSpinBox">
+           <item>
+            <widget class="QSpinBox" name="HeaderSpin"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_6">
+       <item>
+        <widget class="QTableView" name="tableView"/>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_7">
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_8">
+           <item>
+            <widget class="QLineEdit" name="SelectPathLineEdit_2"/>
+           </item>
+           <item>
+            <widget class="QPushButton" name="SelectNeedDataAnalysisDirButton_2">
+             <property name="text">
+              <string>导出</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_9">
+           <property name="sizeConstraint">
+            <enum>QLayout::SetDefaultConstraint</enum>
+           </property>
+          </layout>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1099</width>
+     <height>23</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <tabstops>
+  <tabstop>SelectPathLineEdit</tabstop>
+  <tabstop>SelectNeedDataAnalysisDirButton</tabstop>
+  <tabstop>ReruleLineEdit</tabstop>
+  <tabstop>FilterColNameLineEdit</tabstop>
+  <tabstop>SumColNameLineEdit</tabstop>
+  <tabstop>HeaderSpin</tabstop>
+  <tabstop>tableView</tabstop>
+  <tabstop>SelectPathLineEdit_2</tabstop>
+  <tabstop>SelectNeedDataAnalysisDirButton_2</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>
