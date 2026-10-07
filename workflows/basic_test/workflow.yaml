@@ -1,0 +1,13 @@
+name: basic_test
+version: 1
+
+steps:
+  - id: wait_briefly
+    action: wait
+    seconds: 0.1
+
+  - id: launch_disposable_process
+    action: launch
+    program: cmd.exe
+    args: ["/d", "/c", "exit", "0"]
+    wait_for_exit: true

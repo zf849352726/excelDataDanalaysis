@@ -40,7 +40,7 @@ Workflow Engine
        Windows
 ```
 
-The V2 system should gradually replace filename-driven execution while preserving legacy workflows and existing business features.
+The V2 system should gradually replace filename-driven execution while preserving the current supported legacy workflows and existing business features.
 
 ---
 
@@ -113,6 +113,15 @@ Known legacy issues already identified:
 
 These are migration inputs and technical debt, not reasons to rewrite the entire application.
 
+The current migration baseline contains:
+
+```text
+price\static\auto_click
+price\static\click_next_page
+```
+
+The historical `bim_cal`, `export_startand`, and `temporary_deletion_task` task folders and their 18 step images were retired before V2 implementation. They remain recoverable from Git history but are not part of the active legacy baseline or the planned migration scope.
+
 ---
 
 # 4. Target V2 Shape
@@ -159,15 +168,17 @@ Establish a safe starting point before structural changes.
 
 ## Acceptance
 
-- legacy project is still intact
+- current supported legacy code and the two active task folders are intact
+- retired historical task assets are documented and remain recoverable from Git history
 - no unrelated files are rewritten
-- V2 work can begin without losing legacy behavior
+- the documented Python 3.11 environment imports the legacy application successfully
+- V2 work can begin without losing current supported legacy behavior
 
 ---
 
 # 6. Milestone 1 — Core Workflow Engine
 
-**Status: Ready — current active milestone**
+**Status: Completed — 2026-10-07**
 
 ## Goal
 
@@ -190,10 +201,16 @@ Initial actions:
 
 - `wait`
 - `launch`
-- `type_text`
-- `hotkey`
-- `click_xy`
-- `close_window`
+
+M1 workflow loading must use a strict, minimal schema. Unsupported actions and fields, including `target`, `expect`, `retry`, and `on_fail`, must fail validation instead of being accepted and ignored.
+
+Execution results must distinguish:
+
+- action executed but not verified
+- failed
+- cancelled
+
+The executor stops at the first failed step. Cancellation is cooperative and must interrupt `wait` promptly.
 
 Create:
 
@@ -204,24 +221,28 @@ workflows/basic_test/workflow.yaml
 ## Acceptance
 
 - workflow loads from YAML
+- unsupported fields and action names are rejected with explicit validation errors
 - workflow can run without starting PyQt
 - actions execute in declared order
 - interruptible wait can be cancelled
-- errors produce explicit step failures
+- errors produce explicit step failures and stop later steps
+- cancellation and unverified execution are represented explicitly in results
 - unit tests pass
-- at least one simple workflow is run end-to-end
+- `basic_test` runs end-to-end by launching a disposable process that exits by itself
 
 ## Out of Scope
 
-Do not add UIA, image matching, GUI refactoring, MCP, OCR, or AI Vision in this milestone.
+Do not add UIA, image matching, GUI refactoring, MCP, OCR, AI Vision, global keyboard input, coordinate clicking, or window-closing actions in this milestone.
 
 ---
 
-# 7. Milestone 2 — UIA Locator
+# 7. Milestone 2 — UIA Vertical Slice
+
+**Status: Pending review — not active**
 
 ## Goal
 
-Prove semantic Windows automation without image templates.
+Prove a complete semantic Windows automation path without image templates.
 
 ## Deliverables
 
@@ -232,6 +253,10 @@ Add:
 - UIA locator
 - locator-chain foundation
 - UIA selectors for process/window/control metadata
+- target-bound `click`, `type_text`, and `close_window` actions
+- the minimum window/UIA verification needed by the Notepad scenario
+
+Target-bound actions must operate only on an element resolved for the current step. `close_window` must close only the process/window launched and identified by the current run. It must not send a focus-based close command to an arbitrary foreground window.
 
 Primary integration workflow:
 
@@ -249,6 +274,8 @@ If the save prompt appears, handle it through UIA.
 
 - workflow does not depend on fixed window position
 - no image template is required
+- the workflow verifies the expected text/window state before reporting success
+- only the Notepad process/window owned by the run is closed
 - Notepad scenario succeeds 5/5 times in the same supported environment
 - locator failures stop safely and are diagnosable
 
@@ -290,15 +317,16 @@ price\static\click_next_page
 - old source assets remain untouched
 - image locator reports confidence
 - ambiguous matches can halt instead of blindly clicking
-- migrated workflows execute through V2
+- migrated workflows can be run through V2 under human supervision
+- runs without an explicit expectation are reported as action-executed-but-unverified, never as verified success
 
 ---
 
-# 9. Milestone 4 — Verification and Retry
+# 9. Milestone 4 — Verification Expansion and Retry
 
 ## Goal
 
-Make V2 outcome-aware instead of assuming that an action succeeded.
+Expand the M2 vertical-slice verification into reusable outcome-aware policies instead of assuming that an action succeeded.
 
 ## Deliverables
 
@@ -311,7 +339,8 @@ Initial verifiers:
 - `image_exists`
 - `image_disappeared`
 - `file_exists`
-- `screen_changed`
+
+Only verifiers required by the M2 and M3 integration workflows are completion requirements for this milestone. Additional verifiers such as `screen_changed` should be added only with a concrete workflow and acceptance case.
 
 Execution policy:
 
@@ -340,37 +369,73 @@ Support:
 
 ---
 
-# 10. Milestone 5 — PyQt Integration
+# 10. Milestone 5 — PyQt5 Single-Run Integration
 
 ## Goal
 
-Reconnect the new engine to the existing application without moving execution back into the GUI thread.
+Reconnect the new engine to the existing PyQt5 application without moving execution back into the GUI thread. Do not rewrite the GUI in C++ or migrate Qt bindings in this milestone.
 
 ## Deliverables
 
 Add:
 
 - `AutomationService`
-- worker-thread integration
+- a `QObject` worker moved to a dedicated `QThread`
 - status/progress signals
+
+Worker-to-GUI communication must use queued signals/slots. Worker lifecycle and cleanup must be explicit; widgets are created and updated only on the main thread.
+
+Threading model:
+
+```text
+PyQt5 main thread
+      │ signals / slots
+      ↓
+AutomationService worker
+      │
+      ↓
+WorkflowExecutor
+```
 
 Wire existing automation UI concepts to V2:
 
 - workflow list
 - step list
-- run
-- pause
-- resume
-- stop
-- run count / loop mode
+- single workflow run
+- stop active workflow
 - logs/status
 
 ## Acceptance
 
 - long-running automation does not freeze the GUI
-- GUI does not directly call OpenCV / pyautogui / pywinauto
+- V2 workflow execution paths in the GUI do not directly call OpenCV / pyautogui / pywinauto
+- worker events update widgets only through main-thread signals/slots
 - stop works on an active workflow
 - legacy business features outside automation remain intact
+- the existing screenshot button may retain its current behavior because it is outside the V2 execution path
+
+---
+
+# 10a. Milestone 5b — Pause, Resume, and Loop Control
+
+## Goal
+
+Complete execution controls before adding workflow authoring tools.
+
+## Deliverables
+
+- GUI-independent pause/resume control in the executor/service layer
+- GUI pause and resume controls
+- run count and loop mode
+- cooperative pause/stop checks during waits, retries, and between loop iterations
+
+## Acceptance
+
+- pause does not block the Qt main thread
+- resume continues the same active run safely
+- stop can interrupt a paused run
+- loop count is bounded when configured and does not hide individual run failures
+- pause/resume and loop behavior have deterministic tests outside PyQt plus GUI integration validation
 
 ---
 
@@ -460,6 +525,8 @@ WPS:
 
 Expose Automation Hub as a semantic tool surface for Codex / DSH / ChatGPT.
 
+Only workflows explicitly marked as MCP-callable may be exposed for execution. Any workflow with desktop or other external side effects requires confirmation from the local operator through the PyQt5 application. If the confirmation UI is not running or approval cannot be obtained, `run_workflow` must reject the request explicitly.
+
 ## Candidate MCP Operations
 
 ```text
@@ -478,6 +545,11 @@ get_failed_step
 ## Acceptance
 
 AI clients invoke meaningful workflows rather than raw desktop coordinates.
+
+- read-only discovery remains available without the GUI confirmation surface
+- only allowlisted workflows can be requested through MCP
+- side-effectful runs do not start before local confirmation
+- missing or rejected confirmation produces an explicit refusal result
 
 Preferred:
 
@@ -521,7 +593,27 @@ Primary V2 workflow format:
 YAML
 ```
 
-Representative example:
+M1 supports only a strict minimal subset:
+
+```yaml
+name: basic_test
+version: 1
+
+steps:
+  - id: wait_briefly
+    action: wait
+    seconds: 0.1
+
+  - id: launch_disposable_process
+    action: launch
+    program: cmd.exe
+    args: ["/d", "/c", "exit", "0"]
+    wait_for_exit: true
+```
+
+The M1 `launch` action passes `program` and `args` directly to a process API with shell execution disabled. The loader must reject unknown workflow fields, step fields, and action names. Fields introduced by later milestones must not be silently retained or ignored.
+
+Target format after M2-M4 capabilities are available:
 
 ```yaml
 name: export_report
@@ -552,7 +644,7 @@ steps:
     on_fail: stop
 ```
 
-The exact schema may evolve during implementation.
+The schema evolves only when its owning milestone implements and validates the corresponding behavior.
 
 Architectural ownership rules for Action / Locator / Verifier belong in `AGENTS.md`.
 
@@ -594,9 +686,11 @@ M2 UIA
    ↓
 M3 Image + Legacy Migration
    ↓
-M4 Verification
+M4 Verification Expansion / Retry
    ↓
-M5 GUI Integration
+M5 PyQt5 Single-Run Integration
+   ↓
+M5b Pause / Resume / Loop Control
    ↓
 M6 Target Picker
    ↓
@@ -611,30 +705,32 @@ A later milestone may be pulled forward only when there is a concrete need and d
 
 ---
 
-# 18. Current Active Milestone
+# 18. Current Milestone Gate
 
-## Current target
+## Current state
 
-**Milestone 1 — Core Workflow Engine**
+**Milestone 1 — Core Workflow Engine is complete.**
 
-Do not implement later milestones unless explicitly approved.
+Milestone 2 is the next candidate and is not active until explicitly approved.
 
-Expected work for the current milestone:
+Milestone 1 delivered:
 
-1. inspect current repository state
-2. establish the V2 package skeleton needed for M1
-3. implement workflow/step models
-4. implement YAML loader
-5. implement Action Registry
-6. implement WorkflowExecutor
-7. implement CancellationToken
-8. implement the six initial actions
-9. add `basic_test` workflow
-10. add focused tests
-11. run real validation
-12. report results and stop
+- GUI-independent workflow and result models
+- strict M1 YAML loader
+- explicit Action Registry
+- sequential WorkflowExecutor with fail-fast behavior
+- cooperative CancellationToken
+- `wait` and shell-disabled `launch` actions
+- `basic_test` workflow
+- focused unit and integration tests
 
-After Milestone 1 is complete, wait for review before starting Milestone 2.
+Validation completed with the documented Python 3.11 environment:
+
+- full test suite: 20 passed
+- `automation` imports without loading PyQt5
+- `basic_test` completed end-to-end with both steps reported as `executed_unverified`
+
+Wait for review before starting Milestone 2.
 
 ---
 
