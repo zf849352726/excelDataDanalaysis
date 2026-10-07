@@ -7,5 +7,6 @@ class KeyboardControl:
     def type(self, text):
         pyautogui.write(text, interval=Config.get_delay())
 
-    def press_key(self, key):
-        pyautogui.press(key)
+    def press_key(self, key: list):
+        pyautogui.hotkey(key)
+

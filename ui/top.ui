@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>773</width>
-    <height>693</height>
+    <width>871</width>
+    <height>706</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -18,6 +18,9 @@
   </property>
   <property name="cursor">
    <cursorShape>ArrowCursor</cursorShape>
+  </property>
+  <property name="focusPolicy">
+   <enum>Qt::StrongFocus</enum>
   </property>
   <property name="windowTitle">
    <string>计量计价工具箱</string>
@@ -38,6 +41,9 @@
    <bool>false</bool>
   </property>
   <widget class="QWidget" name="centralwidget">
+   <property name="focusPolicy">
+    <enum>Qt::WheelFocus</enum>
+   </property>
    <layout class="QVBoxLayout" name="verticalLayout_11">
     <item>
      <widget class="QTabWidget" name="tabWidget">
@@ -48,7 +54,7 @@
        </sizepolicy>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="tab">
        <attribute name="title">
@@ -147,6 +153,13 @@ background-position: center; /* 将背景图片居中 */</string>
                      <widget class="QCheckBox" name="checkBox">
                       <property name="text">
                        <string>对比表格</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QCheckBox" name="checkBox_8">
+                      <property name="text">
+                       <string>清单转管控表</string>
                       </property>
                      </widget>
                     </item>
@@ -270,7 +283,7 @@ background-position: center; /* 将背景图片居中 */</string>
                     <item>
                      <widget class="QLineEdit" name="SelectPathLineEdit_2">
                       <property name="text">
-                       <string/>
+                       <string>out.xlsx</string>
                       </property>
                       <property name="placeholderText">
                        <string>导出数据的文件夹</string>
@@ -488,7 +501,28 @@ background-position: center; /* 将背景图片居中 */</string>
            </item>
            <item>
             <widget class="QWidget" name="widget_18" native="true">
-             <layout class="QHBoxLayout" name="horizontalLayout_13">
+             <layout class="QHBoxLayout" name="horizontalLayout_13" stretch="10,0,0,80,0,0,0">
+              <item>
+               <widget class="QLabel" name="label_8">
+                <property name="text">
+                 <string>执行次数：</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="spinBox_4">
+                <property name="value">
+                 <number>0</number>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QCheckBox" name="checkBox_9">
+                <property name="text">
+                 <string>循环</string>
+                </property>
+               </widget>
+              </item>
               <item>
                <widget class="QPushButton" name="pushButton_7">
                 <property name="sizePolicy">
@@ -499,6 +533,23 @@ background-position: center; /* 将背景图片居中 */</string>
                 </property>
                 <property name="text">
                  <string>执行</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="label_9">
+                <property name="text">
+                 <string>执行间隔</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QDoubleSpinBox" name="doubleSpinBox"/>
+              </item>
+              <item>
+               <widget class="QPushButton" name="pushButton_13">
+                <property name="text">
+                 <string>停止</string>
                 </property>
                </widget>
               </item>
@@ -714,32 +765,6 @@ background-position: center; /* 将背景图片居中 */</string>
      </widget>
     </item>
    </layout>
-  </widget>
-  <widget class="QDockWidget" name="dockWidget_2">
-   <property name="styleSheet">
-    <string notr="true">border: none;
-background: transparent;</string>
-   </property>
-   <property name="features">
-    <set>QDockWidget::NoDockWidgetFeatures</set>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>1</number>
-   </attribute>
-   <widget class="QWidget" name="dockWidgetContents_2">
-    <layout class="QHBoxLayout" name="horizontalLayout_3">
-     <item>
-      <widget class="QToolButton" name="toolButton_2">
-       <property name="text">
-        <string>...</string>
-       </property>
-       <property name="arrowType">
-        <enum>Qt::LeftArrow</enum>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </widget>
   </widget>
   <widget class="QToolBar" name="toolBar">
    <property name="windowTitle">

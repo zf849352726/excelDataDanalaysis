@@ -1,7 +1,10 @@
 import sys
+import pyautogui
+
+
 class Config:
-    SCREEN_WIDTH = 1920
-    SCREEN_HEIGHT = 1080
+    # 获取屏幕分辨率
+    SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size()
     OPERATION_DELAY = 0.5  # 延迟时间（秒）
     TASKS_IMG_BASE_PATH = r'D:\python_learn\excel_data\price\static'
 

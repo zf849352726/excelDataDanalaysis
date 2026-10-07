@@ -1,30 +1,27 @@
 import os.path
-import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
+from PyQt5.QtGui import QStandardItemModel, QStandardItem, QCursor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-
+from PyQt5.QtCore import Qt, QPoint, QTimer
 from ui.top import *
-from final_cal.ExcelProcessor import ExcelProcessor, TwoExcelProcess
+from final_cal.ExcelProcessor import ExcelProcessor
 from final_cal.FilterStrategy import *
 from final_cal.ReportGenerator import *
-import openpyxl
 import pandas as pd
 from fuzzywuzzy import fuzz
-import win32com.client as win32
 import numpy as np
-from price.moudle.automator import Automator
-from config import Config
-from pathlib import Path
-import time
 import sys
 import pyautogui
 import win32com.client as win32
-from PyQt5.QtCore import Qt, QTimer
 from docx import Document
 from docx.shared import Cm
 import ctypes
+from config import Config
+from price.moudle.automator import Automator
+from pathlib import Path
 import re
+from final_cal.FileManager import FileManager
+# import openpyxl
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -37,10 +34,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.folderName = ""
         self.keyword = "建筑工程|清单带子目"
         self.directory_paths = []
-        self.filter_col = self.FilterColNameLineEdit.text().split(" ")
+        self.filter_col = self.FilterColNameLineEdit.text().split("|")
         self.sum_col = self.SumColNameLineEdit.text()
         self.header = 0
-
+        self.logic = 0
+        self.SelectPathLineEdit_2 = ''
         self.control_and_contract_correspondence_dict = {
             "B1-建筑工程": "管控表1",
             "B2-建筑工程": "管控表2",
@@ -75,9 +73,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         }
         self.word_folder_name = ''
         self.word_pic_paths = []
+        self.task_thread = None  # 任务线程
 
+        # 设置窗口始终保持在最上层
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.installEventFilter(self)  # 监听全局按键
 
         self.SelectNeedDataAnalysisDirButton.clicked.connect(self.openFileDialog)
+        self.SelectNeedDataAnalysisDirButton_2.clicked.connect(self.export_path)
         self.ReruleLineEdit.editingFinished.connect(self.input_re_keyword)
         self.FilterColNameLineEdit.editingFinished.connect(self.input_filter_col)
         self.SumColNameLineEdit.editingFinished.connect(self.input_sum_col)
@@ -88,17 +91,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.testButton.clicked.connect(self.directly_process_the_five_quantity_ledger)
         self.dataMarkButton.clicked.connect(self.data_mark)
         # 计价内容
-        self.export_excel_task_imgs_file_names = None
         self.base_path = Config.get_img_base_path()
+        self.export_excel_task_imgs_file_names = None
         self.tabWidget.currentChanged.connect(self.add_radio_button)
         self.add_radio_button()
-        self.pushButton_7.clicked.connect(self.function)
+        self.set_default_radio_button()
+        self.pushButton_7.clicked.connect(self.start_task)
+        self.pushButton_13.clicked.connect(self.stop_task)
         self.pushButton_2.clicked.connect(self.function_add_steps)
         self.pushButton_5.clicked.connect(self.function_delete_steps)
         self.pushButton_6.clicked.connect(self.function_insert_steps)
         self.pushButton_10.clicked.connect(self.clear_function_input)
         self.pushButton_8.clicked.connect(self.clear_delete_input)
         self.pushButton_9.clicked.connect(self.clear_insert_input)
+        # self.pushButton_13.clicked.connect(self.setflag)
 
         # 工具类
         # 截图
@@ -113,14 +119,53 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # 设置 QGraphicsView 的渲染提示
         self.graphicsView.setRenderHint(QtGui.QPainter.Antialiasing)
         self.graphicsView.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
-        self.graphicsView.setFocusPolicy(QtCore.Qt.StrongFocus)
 
         # excel筛选命令
         self.pushButton_4.clicked.connect(self.filter_excel)
 
-        self.toolButton_2.clicked.connect(self.toggle_hide)  # 按钮点击事件连接到 toggle_hide 方法
-
         self.is_hidden = False  # 状态标记，记录窗口是否隐藏
+
+        # 创建一个独立的工具按钮窗口
+        self.tool_button_window = QtWidgets.QWidget()
+        self.tool_button_window.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)  # 设置浮动窗口属性
+        self.tool_button_window.setGeometry(1000, 500, 60, 60)  # 设置按钮窗口的位置
+        # self.tool_button_window.setWindowTitle("Tool Button Window")
+        # 设置窗口无边框
+        # self.tool_button_window.setWindowFlags(Qt.FramelessWindowHint)  # 去除边框和标题栏
+
+        # 设置透明背景
+        self.tool_button_window.setAttribute(Qt.WA_TranslucentBackground)  # 设置窗口背景透明
+        # 设置窗口背景颜色（如果需要）
+        # self.tool_button_window.setStyleSheet("background-color: rgba(0, 0, 0, 0);")  # 完全透明
+
+        # 创建工具按钮
+        self.toolButton = QtWidgets.QToolButton(self.tool_button_window)
+        self.toolButton.setArrowType(QtCore.Qt.LeftArrow)  # 设置箭头类型为左箭头
+        self.toolButton.setGeometry(0, 0, 60, 60)  # 设置按钮的位置和大小
+
+        # 设置QToolButton的样式表，去除边框
+        self.toolButton.setStyleSheet("""
+                    QToolButton {
+                        color: green;
+                        border: none;             /* 去除边框 */
+                        background: transparent;  /* 设置背景透明 */
+                        padding: 5px;             /* 内边距 */
+                    }
+                """)
+
+        self.toolButton.clicked.connect(self.toggle_hide)  # 点击按钮时切换窗口的显示/隐藏
+
+        # 显示工具按钮窗口
+        self.tool_button_window.show()
+
+        self.timer = QTimer()  # 定时器用于隐藏窗口
+
+        # 只连接一次 timeout 信号
+        self.timer.timeout.connect(self.on_timer_timeout)
+        self.timer.setInterval(50)  # 每隔 1000 毫秒（1秒）触发一次
+        self.is_task_running = False  # 控制任务是否在运行
+
+        self.tool_button_window.setVisible(False)  # 默认隐藏窗口
 
         # word工具内容
         self.pushButton_3.clicked.connect(self.handle_word_pic)
@@ -132,10 +177,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pic_file_list = None
         self.pic_folder_name = ''
 
+    def on_timer_timeout(self):
+        """定时器触发时执行的函数"""
+        self.run_task_logic()  # 运行任务
+        self.checkMouseDistance()  # 检查鼠标距离
+
     def keyPressEvent(self, event):
         try:
+            key = event.key()
+            # 停止任务
+            modifiers = QtWidgets.QApplication.keyboardModifiers()
+            if (modifiers & QtCore.Qt.ControlModifier) and key == QtCore.Qt.Key_C:
+                # print('fafafafaffa')
+                self.pushButton_13.click()
             # 处理 Ctrl + V (粘贴)
-            if event.modifiers() == QtCore.Qt.ControlModifier and event.key() == QtCore.Qt.Key_V:
+            if (modifiers & QtCore.Qt.ControlModifier) and key == QtCore.Qt.Key_V:
                 clipboard = QtWidgets.QApplication.clipboard()
                 mime_data = clipboard.mimeData()
 
@@ -162,7 +218,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     super().keyPressEvent(event)
 
             # 处理 Ctrl + X (剪切)
-            elif event.modifiers() == QtCore.Qt.ControlModifier and event.key() == QtCore.Qt.Key_X:
+            elif (modifiers & QtCore.Qt.ControlModifier) and key == QtCore.Qt.Key_X:
                 # 判断哪个 QGraphicsView 获取了焦点
                 if self.graphicsView.hasFocus():
                     scene = self.scene
@@ -187,7 +243,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         super().keyPressEvent(event)
                 else:
                     super().keyPressEvent(event)
-
         except Exception as e:
             print(f"Error: {e}")
 
@@ -198,6 +253,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # 调整窗口的位置，确保它恢复到屏幕内
             screen_geometry = QApplication.primaryScreen().geometry()  # 获取屏幕的大小
             self.move(screen_geometry.width() - self.width(), self.y())  # 确保窗口恢复在屏幕内
+
         else:
             self.hide_to_right()  # 隐藏窗口到屏幕右侧
         self.is_hidden = not self.is_hidden  # 切换状态
@@ -207,9 +263,47 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         screen_geometry = QApplication.primaryScreen().geometry()  # 获取屏幕的大小
         screen_width = screen_geometry.width()
         screen_height = screen_geometry.height()
-
         # 设置窗口位置为屏幕右侧外部
-        self.move(screen_width - 30, 0)  # 将窗口移到屏幕的右侧外面
+        self.move(screen_width, 0)  # 将窗口移到屏幕的右侧外面
+        self.hide()
+
+    def move_tool_window(self):
+        """ 将工具窗口移动到主窗口的左边缘 """
+        main_window_pos = self.pos()  # 获取主窗口的位置
+        main_window_width = self.width()  # 获取主窗口的宽度
+        tool_window_height = self.tool_button_window.height()  # 获取工具窗口的高度
+        tool_window_width = self.tool_button_window.width()  # 获取工具窗口的高度
+
+        # 计算工具窗口的左上角位置
+        tool_window_x = main_window_pos.x() - self.tool_button_window.width() + tool_window_width // 4+4  # 使工具窗口位于主窗口的左边缘
+        tool_window_y = main_window_pos.y() + (self.height() - tool_window_height) // 2  # 垂直居中
+
+        # 设置工具窗口位置
+        self.tool_button_window.move(tool_window_x, tool_window_y)
+
+    def showEvent(self, event):
+        """ 在主窗口显示时调用，确保工具窗口位置正确 """
+        self.move_tool_window()
+        super().showEvent(event)
+
+    def resizeEvent(self, event):
+        """ 在主窗口大小调整时调用，调整工具窗口的位置 """
+        self.move_tool_window()
+        super().resizeEvent(event)
+
+    def moveEvent(self, event):
+        """ 当主窗口位置变化时，更新工具窗口的位置 """
+        self.move_tool_window()
+
+    def changeEvent(self, event):
+        """ 监听主窗口的状态变化，最小化时最小化工具窗口，恢复时恢复工具窗口 """
+        if event.type() == QtCore.QEvent.WindowStateChange:
+            if self.isMinimized():  # 主窗口最小化
+                self.tool_button_window.hide()  # 工具窗口最小化
+            elif self.isVisible():  # 主窗口恢复显示
+                self.tool_button_window.showNormal()  # 确保工具窗口恢复到正常状态
+                self.tool_button_window.raise_()  # 将工具窗口置于最前面
+        super().changeEvent(event)
 
     def closeEvent(self, event):
         """ 在窗口关闭时，保持窗口在右侧外部 """
@@ -218,6 +312,28 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             event.ignore()  # 忽略关闭事件，防止程序退出
         else:
             event.accept()  # 正常关闭窗口
+
+    def checkMouseDistance(self):
+        # 获取鼠标的当前坐标
+        mouse_pos = QCursor.pos()  # 获取鼠标的全局位置
+        window_rect = self.tool_button_window.rect()  # 获取工具窗口的局部矩形区域
+        window_pos = self.tool_button_window.mapToGlobal(QPoint(0, 0))  # 获取窗口的全局位置
+
+        # 计算鼠标与窗口矩形的最小距离
+        distance_x = max(0, abs(mouse_pos.x() - window_pos.x()) - window_rect.width())
+        distance_y = max(0, abs(mouse_pos.y() - window_pos.y()) - window_rect.height())
+
+        distance = max(distance_x, distance_y)  # 取鼠标到窗口的最小距离
+
+        # 如果鼠标离窗口的距离小于10，显示窗口，否则隐藏
+        if distance < 50:
+            self.tool_button_window.show()
+        else:
+            self.tool_button_window.hide()
+
+    def mouseMoveEvent(self, event):
+        """捕获鼠标移动事件"""
+        super().mouseMoveEvent(event)
 
     def openFileDialog(self):
         # 打开文件夹选择对话框
@@ -228,11 +344,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.directory_paths.append(self.folderName.replace("/", "\\"))
             self.show_columns(self.directory_paths, self.keyword, self.header)
 
+    def export_path(self, ):
+        # 打开文件夹选择对话框
+        self.SelectPathLineEdit_2 = QFileDialog.getExistingDirectory(self, "选择文件夹", "")
+        if self.SelectPathLineEdit_2:
+            # print(f'Selected folder: {self.folderName}')
+            self.self.SelectPathLineEdit_2.setText(self.self.SelectPathLineEdit_2)
+
     def show_columns(self, directory_paths, keyword, header):
         try:
             file_manager = FileManager(directory_paths, keyword)
             excel_files = file_manager.get_excel_files()
             data = file_manager.read_excel(excel_files[0], header=header)
+            # 去除列名中的空格
+            data.columns = data.columns.str.replace(' ', '', regex=False)
             self.model = DataFrameModel(data)
             self.TableColName.setModel(self.model)
         except Exception as e:
@@ -242,7 +367,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.keyword = self.ReruleLineEdit.text()
 
     def input_filter_col(self):
-        self.filter_col = self.FilterColNameLineEdit.text().split(" ")
+        self.filter_col = self.FilterColNameLineEdit.text().split("|")
 
     def input_sum_col(self):
         self.sum_col = self.SumColNameLineEdit.text()
@@ -253,28 +378,34 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.show_columns(self.directory_paths, self.keyword, self.header)
 
     def data_main(self):
-        output_path = os.path.join(self.directory_paths[0], 'out.xlsx')
-        keyword = self.keyword
-        report_generator = SubReport()
-        filter_strategy = None
-        if not self.checkBox.isChecked() and not self.checkBox_7.isChecked():
-            # filter_strategy = GeneralFilter([(4, "砖基础"), (3, "001")])
-            filter_strategy = NameProjectFeatureUnitSameFilter(self.filter_col, self.sum_col)
+        try:
+            output_path = os.path.join(self.directory_paths[0], f'{os.path.join(self.SelectPathLineEdit_2, "out.xlsx")}')
+            keyword = self.keyword
+            report_generator = SubReport()
+            filter_strategy = None
+            if not self.checkBox.isChecked() and not self.checkBox_7.isChecked() and not self.checkBox_8.isChecked():
+                # filter_strategy = GeneralFilter([(4, "砖基础"), (3, "001")])
+                filter_strategy = NameProjectFeatureUnitSameFilter(self.filter_col, self.sum_col)
 
-        elif self.checkBox.isChecked():
-            # self.SumColNameLineEdit.clear()
-            file_manager = FileManager(self.directory_paths, self.keyword)
-            excel_files = file_manager.get_excel_files()
-            if len(excel_files) > 1:
-                self.compare_two_excel_sheets(excel_files[0], excel_files[1])
+            elif self.checkBox.isChecked():
+                # self.SumColNameLineEdit.clear()
+                file_manager = FileManager(self.directory_paths, self.keyword)
+                excel_files = file_manager.get_excel_files()
+                if len(excel_files) > 1:
+                    self.compare_two_excel_sheets(excel_files[0], excel_files[1])
 
-        elif self.checkBox_7.isChecked():
-            filter_strategy = NameProjectFeatureUnitSameFilterList(self.filter_col, self.sum_col)
+            elif self.checkBox_7.isChecked():
+                filter_strategy = NameProjectFeatureUnitSameFilterList(self.filter_col, self.sum_col)
 
-        processor = ExcelProcessor(filter_strategy, report_generator)
-        summed_data = processor.process(self.directory_paths, output_path, keyword, self.header)
-        self.model = DataFrameModel(summed_data)
-        self.DataTableView.setModel(self.model)
+            elif self.checkBox_8.isChecked():
+                filter_strategy = ListToControl(self.filter_col, self.sum_col)
+
+            processor = ExcelProcessor(filter_strategy, report_generator)
+            summed_data_avoid_name = processor.process(self.directory_paths, output_path, keyword, self.header)
+            self.model = DataFrameModel(summed_data_avoid_name)
+            self.DataTableView.setModel(self.model)
+        except Exception as e:
+            print(e)
 
     def compare_two_excel_sheets(self, df1_path, df2_path):
         df1_file_name = df1_path.split('\\')[-1].split('.')[0]
@@ -309,6 +440,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         df2_only.to_excel(os.path.join(self.folderName, f"{df2_file_name}有{df1_file_name}没有.xlsx"), index=False)
 
         print("文件已保存！")
+
+        # 去重都有
+        both_df = pd.read_excel(os.path.join(self.folderName, f"{df1_file_name}{df2_file_name}都有.xlsx"), engine='openpyxl')
+        both_df = both_df.drop_duplicates(subset=self.filter_col)
+        both_df.to_excel(os.path.join(self.folderName, f"{df1_file_name}{df2_file_name}都有.xlsx"), index=False)
+        # print(both_df)
 
     def five_measure_ledger(self):
         for checklist, control in self.control_and_contract_correspondence_dict.items():
@@ -582,37 +719,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             excel.Quit()
 
     # 计价内容
-    # 执行
-    def run_task(self, c_task_name):
-        automator = Automator()
-        automator.execute_task(c_task_name)
-
-    def task(self, c_task_img_path):
-        # print(c_task_img_path)
-        export_excel_task_path = Path(self.base_path) / c_task_img_path
-        # 获取目录下所有文件的文件名（只取文件）
-        self.export_excel_task_imgs_file_names = [f for f in export_excel_task_path.iterdir() if f.is_file()]
-        # print([f.name for f in export_excel_task_imgs_file_names])
-
-        # 根据序号顺序执行任务
-        for img in sorted(self.export_excel_task_imgs_file_names, key=self.extract_number):  # 按文件名.排序
-            Automator.task_img_path = img.resolve()
-            print(Automator.task_img_path)
-            task_name = img.stem.split('-')[-1]  # 只取文件名，不含扩展名
-            # print(task_name)
-            try:
-                self.run_task(task_name)
-            except Exception as e:
-                print(f"任务 {task_name} 执行失败: {e}")
-
-    def extract_number(self, s):
-        """ 提取文件名中的数字部分并返回数字值，用于排序 """
-        # 确保提取的是文件名的字符串部分
-        file_name = str(s.name)  # 转换为字符串（文件名）
-        match = re.match(r"(\d+)", file_name)  # 提取文件名开头的数字部分
-        # 如果没有数字，返回一个很大的数字，让它排到最后
-        return int(match.group(1)) if match else float('inf')
-
     def add_radio_button(self):
         self.textEdit.clear()
         for radio_button_obj in self.widget_19.findChildren(QtWidgets.QRadioButton):
@@ -639,6 +745,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             task_name_list.append(task_name)
         return task_name_list
 
+    def set_default_radio_button(self):
+        for i, radio_button in enumerate(self.widget_19.findChildren(QtWidgets.QRadioButton)):
+            if i == 0:
+                radio_button.setChecked(True)  # 设置默认选中
+
     def show_already_task_steps(self):
         self.textEdit.clear()
         task_name_list = self.get_already_task_steps()
@@ -650,13 +761,66 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         return tasks_menu
 
-    def function(self):
-        # # c_task_name为当前视口被选中的raidobutton
-        # task_name_path = Path(self.base_path) / c_task_name
-        # if not os.path.exists(task_name_path):
-        #     os.mkdir(task_name_path)
+    def start_task(self):
+        """ 启动任务（开始定时器） """
+        task_count = self.spinBox_4.value()
+        if self.checkBox_9.isChecked() and not self.is_task_running and task_count == 0:
+            print("循环模式")
+            self.is_task_running = True
+            self.timer.start()
+        elif task_count > 0 and not self.is_task_running and not self.checkBox_9.isChecked():
+            print(f"启动任务，每次执行 {task_count} 次任务")
+            self.is_task_running = True
+            self.timer.start()  # 启动定时器
+        else:
+            print("任务已在运行")
+
+    def run_task_logic(self):
         radio_button = self.get_selected_radio_button()
-        self.task(radio_button.text())
+        """定期运行的任务逻辑"""
+        # print('checkBox_9.isChecked():', self.checkBox_9.isChecked())
+        # print('self.spinBox_4:', self.spinBox_4.value())
+        if self.checkBox_9.isChecked() and (self.spinBox_4.value() == 0):
+            # print("xxxxxxxxxx")
+            self.task(radio_button.text())  # 执行任务
+
+        elif int(self.spinBox_4.text()) and not self.checkBox_9.isChecked():
+            for i in range(int(self.spinBox_4.text())):
+                print(i)
+                self.task(radio_button.text())  # 执行任务
+            self.stop_task()
+            return
+
+    def run_task(self, c_task_name):
+        """执行指定的任务"""
+        automator = Automator(tm=self.doubleSpinBox.value())
+        automator.execute_task(c_task_name)
+
+    def task(self, c_task_img_path):
+        """执行任务图片路径下的所有任务"""
+        export_excel_task_path = Path(self.base_path) / c_task_img_path
+        self.export_excel_task_imgs_file_names = [f for f in export_excel_task_path.iterdir() if f.is_file()]
+
+        for img in sorted(self.export_excel_task_imgs_file_names, key=self.extract_number):
+            Automator.task_img_path = img.resolve()
+            task_name = img.stem.split('-')[-1]  # 只取文件名，不含扩展名
+            try:
+                self.run_task(task_name)
+            except Exception as e:
+                print(f"任务 {task_name} 执行失败: {e}")
+
+    def extract_number(self, s):
+        """提取文件名中的数字部分并返回数字值，用于排序"""
+        file_name = str(s.name)
+        match = re.match(r"(\d+)", file_name)
+        return int(match.group(1)) if match else float('inf')
+
+    def stop_task(self):
+        """ 停止任务（停止定时器） """
+        if self.is_task_running:
+            print("任务已停止")
+            self.timer.stop()  # 停止定时器
+            self.is_task_running = False
 
     def get_selected_radio_button(self):
         for radio_button in self.widget_19.findChildren(QtWidgets.QRadioButton):
@@ -894,7 +1058,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 for inline_shape in doc.inline_shapes:
                     # 设置图片大小 (可选)
                     inline_shape.width = Cm(int(self.spinBox.text()))  # 设置图片宽度为5厘米
-                    inline_shape.height = Cm(3)  # 设置图片高度为3厘米
+                    inline_shape.height = Cm(int(self.spinBox_2.text()))  # 设置图片高度为3厘米
                 # 保存文档
                 doc.save(doc_list[0])
             else:
@@ -937,11 +1101,11 @@ def run_as_admin():
 
 
 if __name__ == '__main__':
-    # # 检查是否具有管理员权限
-    # if not is_admin():
-    #     print("需要管理员权限，正在以管理员权限重新启动...")
-    #     run_as_admin()  # 重新以管理员权限运行脚本
-    #     sys.exit(0)
+    # 检查是否具有管理员权限
+    if not is_admin():
+        # print("需要管理员权限，正在以管理员权限重新启动...")
+        run_as_admin()  # 重新以管理员权限运行脚本
+        sys.exit(0)
     # # # 设置应用程序的背景透明，确保窗口和控件都能显示
     # # app.setAttribute(Qt.AA_UseSoftwareOpenGL)
     app = QApplication(sys.argv)

@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+
+# Build / packaging output
+build/
+dist/
+
+# Automation Hub runtime output
+runs/
+
+# Logs / temporary files
+*.log
+*.tmp
+*.bak
+~$*
+
+# Local generated test/output files
+file1 - 副本.xlsx
+file2 - 副本.xlsx
+file2_updated.xlsx
+modified_file.docx
+output.docx
+
+# Temporary documentation backups
+AGENTS.before_split.md
+plan.before_split.md

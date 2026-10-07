@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "excel-data-automation-hub"
+version = "0.1.0"
+description = "Legacy Excel/data desktop application with Automation Hub V2 under development."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pandas",
+    "numpy",
+    "PyQt5",
+    "PyAutoGUI",
+    "python-docx",
+    "fuzzywuzzy",
+    "python-Levenshtein",
+    "pywin32",
+    "openpyxl",
+    "opencv-python",
+    "PyDirectInput",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7,<9",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["automation*", "final_cal*", "price*", "ui*"]
+exclude = ["build*", "dist*", "tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

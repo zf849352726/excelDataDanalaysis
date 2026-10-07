@@ -8,7 +8,7 @@ import time
 class ImageRecognition:
     has_run = False
 
-    def __init__(self, template_path, threshold=0.8):
+    def __init__(self, template_path, tm, threshold=0.8):
         self.template = cv2.imread(template_path, cv2.IMREAD_GRAYSCALE)
         self.threshold = threshold
         if self.template is None:
@@ -16,13 +16,13 @@ class ImageRecognition:
 
             # 检查模板的大小，并准备调整模板尺寸
         self.template_resized = None
-        self.adjust_template_size()
+        self.adjust_template_size(tm)
 
-    def adjust_template_size(self):
+    def adjust_template_size(self, tm):
         """
         调整模板图像大小，使其适应较小的屏幕截图
         """
-        time.sleep(0.5)
+        time.sleep(tm)
         screenshot = pyautogui.screenshot()
         screenshot_np = np.array(screenshot)
         screenshot_gray = cv2.cvtColor(screenshot_np, cv2.COLOR_RGB2GRAY)

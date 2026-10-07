@@ -8,11 +8,12 @@
 
 """
 import pandas as pd
-from final_cal.FileManager import FileManager
 from pathlib import Path
 
+
 class FilterStrategy:
-    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '', flag: bool = True) -> pd.DataFrame:
+    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '',
+               flag: bool = True) -> pd.DataFrame:
         raise NotImplementedError("Subclasses should implement this filter method.")
 
 
@@ -21,7 +22,8 @@ class ProjectNameFeatureFilter(FilterStrategy):
     def __init__(self, feature: str):
         self.feature = feature
 
-    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '', flag: bool = True) -> pd.DataFrame:  # data为起始值
+    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '',
+               flag: bool = True) -> pd.DataFrame:  # data为起始值
         filtered_data = data[data['项目名称与特征'].astype(str).str.contains(self.feature, na=False)]
         return filtered_data
 
@@ -36,8 +38,17 @@ class NameProjectFeatureUnitSameFilter(FilterStrategy):
         self.conditions = conditions
         self.sum_col = sum_col
 
-    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '', flag: bool = True) -> pd.DataFrame:  # data为起始值
+    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '',
+               flag: bool = True) -> pd.DataFrame:  # data为起始值
         try:
+            # 将所有列名转换为字符串类型
+            data.columns = data.columns.astype(str)
+            # 去除列名两端的空格
+            data.columns = data.columns.str.strip()
+            # 去掉换行符号
+            data.columns = data.columns.str.replace('\n', '')
+
+            # print(data.columns)
             file_name = Path(file_path).parent.name
             # 处理缺失值
             data = data.fillna({col: 'Unknown' for col in self.conditions})
@@ -87,8 +98,11 @@ class NameProjectFeatureUnitSameFilterList(FilterStrategy):
         self.conditions = conditions
         self.sum_col = sum_col
 
-    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '', flag: bool = True) -> pd.DataFrame:  # data为起始值
+    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '',
+               flag: bool = True) -> pd.DataFrame:  # data为起始值
         try:
+            # 去除列名中的空格
+            data.columns = data.columns.str.replace(' ', '', regex=False)
             file_name = Path(file_path).parent.name
             # 处理缺失值
             data = data.fillna({col: 'Unknown' for col in self.conditions})
@@ -136,7 +150,8 @@ class GeneralFilter(FilterStrategy):
         """
         self.conditions = conditions
 
-    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '', flag: bool = True) -> pd.DataFrame:
+    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '',
+               flag: bool = True) -> pd.DataFrame:
         """
         根据条件列表连续筛选数据
         :param flag:
@@ -160,9 +175,11 @@ class CompareTwoExcel(FilterStrategy):
         :param conditions: 条件列表，eg.['名称', '项目特征描述', '计量单位']
         :param sum_col: 需求和的列名，eg."工程量"
         """
+        self.sum_col = None
         self.conditions = conditions
 
-    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '', flag: bool = True) -> pd.DataFrame:  # data为起始值
+    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '',
+               flag: bool = True) -> pd.DataFrame:  # data为起始值
         # 处理缺失值
         data = data.fillna({col: 'Unknown' for col in self.conditions})
 
@@ -182,3 +199,18 @@ class CompareTwoExcel(FilterStrategy):
         ).agg(agg_dict)
 
         return aggregated_data
+
+
+class ListToControl(FilterStrategy):
+    def __init__(self, conditions: list, sum_col: str):
+        self.conditions = conditions
+        self.sum_col = sum_col
+
+    def filter(self, data: pd.DataFrame, every_col_agg_method: str = 'first', file_path: str = '',
+               flag: bool = True) -> pd.DataFrame:
+        # 保留格式 考虑用openpyxl
+
+        return data
+
+
+

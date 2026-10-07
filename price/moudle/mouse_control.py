@@ -7,6 +7,7 @@ class MouseControl:
     def __init__(self):
         self.position = (0, 0)
         self.distance = 0
+        pdi.FAILSAFE = True  # 让鼠标移到屏幕角落可以终止任务
 
     def move_to(self, x, y):
         self.position = (x, y)
@@ -15,8 +16,6 @@ class MouseControl:
 
     def click(self):
         try:
-            # time.sleep(1)
-            # 鼠标左键点击
             pdi.click()
         except Exception as e:
             print(e)
