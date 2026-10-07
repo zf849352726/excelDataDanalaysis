@@ -2,35 +2,25 @@
 
 from __future__ import annotations
 
-import time
 from typing import Any, Mapping
 
 from automation.engine.errors import WorkflowCancelled
 from automation.engine.models import ExecutionContext, VerificationResult
 from automation.locators.chain import LocatorChain
 from automation.locators.models import LocatorResult
+from automation.verification.target import (
+    TargetDisappearedVerifier,
+    TargetExistsVerifier,
+)
+from automation.verification.timing import verification_deadline, wait_for_poll
 
 
-class UIAExistsVerifier:
-    def verify(
-        self,
-        expectation: Mapping[str, Any],
-        context: ExecutionContext,
-        action_target: Any | None,
-        locator_chain: LocatorChain,
-    ) -> VerificationResult:
-        result = locator_chain.resolve(expectation["target"], context)
-        return VerificationResult(
-            True,
-            "UIA target exists",
-            metadata=dict(result.metadata),
-        )
+class UIAExistsVerifier(TargetExistsVerifier):
+    def __init__(self) -> None:
+        super().__init__("UIA target")
 
 
 class UIATextEqualsVerifier:
-    _TIMEOUT_SECONDS = 5.0
-    _POLL_INTERVAL_SECONDS = 0.1
-
     def verify(
         self,
         expectation: Mapping[str, Any],
@@ -48,7 +38,7 @@ class UIATextEqualsVerifier:
             return VerificationResult(False, "UIA text verification has no target")
 
         expected = expectation["value"]
-        deadline = time.monotonic() + self._TIMEOUT_SECONDS
+        deadline = verification_deadline(context)
         actual = None
         while True:
             if context.cancellation.is_cancelled:
@@ -60,37 +50,14 @@ class UIATextEqualsVerifier:
                     "UIA text equals expected value",
                     metadata={"expected": expected, "actual": actual},
                 )
-            if time.monotonic() >= deadline:
+            if not wait_for_poll(context, deadline):
                 return VerificationResult(
                     False,
                     f"UIA text mismatch: expected {expected!r}, got {actual!r}",
                     metadata={"expected": expected, "actual": actual},
                 )
-            context.cancellation.wait(self._POLL_INTERVAL_SECONDS)
 
 
-class UIADisappearedVerifier:
-    _TIMEOUT_SECONDS = 5.0
-    _POLL_INTERVAL_SECONDS = 0.1
-
-    def verify(
-        self,
-        expectation: Mapping[str, Any],
-        context: ExecutionContext,
-        action_target: Any | None,
-        locator_chain: LocatorChain,
-    ) -> VerificationResult:
-        deadline = time.monotonic() + self._TIMEOUT_SECONDS
-        while True:
-            if context.cancellation.is_cancelled:
-                raise WorkflowCancelled("UIA disappearance verification cancelled")
-            target = locator_chain.locate_once(expectation["target"], context)
-            if target is None:
-                return VerificationResult(True, "UIA target disappeared")
-            if time.monotonic() >= deadline:
-                return VerificationResult(
-                    False,
-                    "UIA target still exists",
-                    metadata=dict(target.metadata),
-                )
-            context.cancellation.wait(self._POLL_INTERVAL_SECONDS)
+class UIADisappearedVerifier(TargetDisappearedVerifier):
+    def __init__(self) -> None:
+        super().__init__("UIA target")

@@ -17,7 +17,12 @@ def test_loads_notepad_uia_workflow() -> None:
         project_root / "workflows" / "notepad_uia" / "workflow.yaml"
     )
 
-    assert [step.action for step in workflow.steps] == ["launch", "type_text", "click"]
+    assert [step.action for step in workflow.steps] == [
+        "launch",
+        "type_text",
+        "type_text",
+        "close_window",
+    ]
     assert workflow.steps[0].parameters["process_alias"] == "notepad_m2"
     assert workflow.steps[1].target is not None
     assert workflow.steps[1].expectation["type"] == "uia_text_equals"

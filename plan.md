@@ -329,6 +329,8 @@ price\static\click_next_page
 
 # 9. Milestone 4 — Verification Expansion and Retry
 
+**Status: Completed — 2026-10-07**
+
 ## Goal
 
 Expand the M2 vertical-slice verification into reusable outcome-aware policies instead of assuming that an action succeeded.
@@ -714,7 +716,7 @@ A later milestone may be pulled forward only when there is a concrete need and d
 
 ## Current state
 
-**Milestone 3 — Image Locator and Legacy Migration is complete. Milestone 4 is pending review and is not active.**
+**Milestone 4 — Verification Expansion and Retry is complete. Milestone 5 is pending review and is not active.**
 
 Milestone 1 is complete and committed locally as `5c1f9fb`.
 
@@ -772,7 +774,30 @@ Validation completed with the documented Python 3.11 environment:
 
 The real migrated desktop workflows were not clicked during unattended validation. They are available through an opt-in test that requires `AUTOMATION_LEGACY_UI_TESTS=1` and human supervision, and it requires the final result to remain `executed_unverified`.
 
-Wait for review before starting Milestone 4.
+Milestone 4 delivered:
+
+- per-attempt cooperative timeouts and bounded retries across locate, action, and verify
+- cancellable retry intervals and explicit `on_fail: stop | continue` behavior
+- final workflow failure retention when a failed step is allowed to continue
+- structured attempt history, attempt counts, and verification diagnostics in step results
+- reusable window, UIA, image, and workflow-relative file outcome verifiers
+- strict schema validation for timeout, retry, retry interval, failure policy, and verifier targets
+- a Notepad workflow compatible with both tabbed and classic UIA trees
+- safe Notepad closing through a declared document close button or a new run-owned window
+- explicit `discard_changes` handling for the run-owned classic Notepad save prompt
+
+Validation completed with the documented Python 3.11 environment:
+
+- full default test suite: 71 passed, 2 desktop integration tests skipped by default
+- opt-in Notepad UI integration: 5/5 verified runs in the current classic Notepad environment
+- timeout, retry success, retry exhaustion, retry cancellation, and continue-on-failure tests pass
+- success and failure coverage exists for window, UIA, image, and file verification
+- the Notepad test asset remains unchanged and no test window remains open
+- `automation` imports without loading PyQt5
+
+The migrated legacy desktop workflows remain supervised opt-in runs and still report `executed_unverified` when no expectation is declared.
+
+Wait for review before starting Milestone 5.
 
 ---
 

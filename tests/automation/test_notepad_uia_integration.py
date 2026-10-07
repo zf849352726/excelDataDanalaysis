@@ -29,7 +29,12 @@ def test_notepad_uia_succeeds_five_times() -> None:
         results.append(result)
         if result.status is not ExecutionStatus.VERIFIED:
             pytest.fail(
-                [(step.step_id, step.status.value, step.result.message) for step in result.steps]
+                repr(
+                    [
+                        (step.step_id, step.status.value, step.result.message)
+                        for step in result.steps
+                    ]
+                )
             )
         time.sleep(0.2)
 

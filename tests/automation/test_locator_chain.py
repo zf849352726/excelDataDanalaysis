@@ -1,6 +1,13 @@
 import pytest
 
-from automation.engine import AmbiguousTarget, CancellationToken, ExecutionContext
+import time
+
+from automation.engine import (
+    AmbiguousTarget,
+    CancellationToken,
+    ExecutionContext,
+    StepTimeout,
+)
 from automation.engine.errors import WorkflowCancelled
 from automation.locators import LocatorChain, LocatorRegistry, LocatorResult
 
@@ -74,4 +81,17 @@ def test_locator_chain_honors_cancellation() -> None:
         LocatorChain(registry, timeout_seconds=5).resolve(
             {"strategies": ({"type": "none"},)},
             ExecutionContext(cancellation=token),
+        )
+
+
+def test_locator_chain_honors_step_deadline() -> None:
+    registry = LocatorRegistry()
+    registry.register(
+        "none", FakeLocator(LocatorResult(False, "none"), [], "none")
+    )
+    context = ExecutionContext(deadline=time.monotonic() - 0.01)
+
+    with pytest.raises(StepTimeout, match="step timeout"):
+        LocatorChain(registry, timeout_seconds=5).resolve(
+            {"strategies": ({"type": "none"},)}, context
         )

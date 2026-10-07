@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -27,6 +28,10 @@ class Step:
     name: str | None = None
     target: Mapping[str, Any] | None = None
     expectation: Mapping[str, Any] | None = None
+    timeout: float | None = None
+    retry: int = 0
+    retry_interval: float = 0.0
+    on_fail: str = "stop"
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +48,16 @@ class ExecutionContext:
     working_directory: Path | None = None
     processes: dict[str, "ProcessReference"] = field(default_factory=dict)
     runtime_state: dict[str, Any] = field(default_factory=dict)
+    deadline: float | None = None
+
+    @property
+    def is_timed_out(self) -> bool:
+        return self.deadline is not None and time.monotonic() >= self.deadline
+
+    def remaining_seconds(self) -> float | None:
+        if self.deadline is None:
+            return None
+        return max(0.0, self.deadline - time.monotonic())
 
 
 @dataclass(slots=True)

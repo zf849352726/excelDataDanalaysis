@@ -45,5 +45,9 @@ class VerificationFailed(AutomationError):
     """Raised when an action's declared expectation is not met."""
 
 
+class StepTimeout(AutomationError):
+    """Raised when a logical step attempt exceeds its cooperative deadline."""
+
+
 class LegacyMigrationError(AutomationError):
     """Raised when a legacy task cannot be migrated without guessing."""

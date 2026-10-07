@@ -39,14 +39,15 @@ class UIALocator:
 
         control_selector = selector.get("control")
         if control_selector is None:
-            candidates = matching_roots
+            candidate_pairs = [(root, root) for root in matching_roots]
         else:
-            candidates = [
-                control
+            candidate_pairs = [
+                (root, control)
                 for root in matching_roots
                 for control in self._descendants(root)
                 if self._matches(control, control_selector, window=False)
             ]
+        candidates = [candidate for _, candidate in candidate_pairs]
 
         metadata = {
             "process_alias": process_alias,
@@ -66,7 +67,7 @@ class UIALocator:
                 metadata=metadata,
             )
 
-        element = candidates[0]
+        root, element = candidate_pairs[0]
         process.bound_pid = element.process_id()
         rectangle = element.rectangle()
         bounds = (
@@ -83,6 +84,9 @@ class UIALocator:
                 "control_type": element.element_info.control_type,
                 "automation_id": element.element_info.automation_id,
                 "class_name": element.element_info.class_name,
+                "window_handle": root.handle,
+                "window_is_new": root.handle
+                not in context.runtime_state.get(self._BASELINE_WINDOWS_KEY, {}),
             }
         )
         return LocatorResult(

@@ -38,8 +38,8 @@ steps:
     assert workflow.steps[1].parameters["args"] == ("/d", "/c", "exit", "0")
 
 
-@pytest.mark.parametrize("field", ["target", "expect", "retry", "on_fail"])
-def test_rejects_fields_owned_by_later_milestones(
+@pytest.mark.parametrize("field", ["coordinates", "screen_changed"])
+def test_rejects_unknown_step_fields(
     tmp_path: Path, field: str
 ) -> None:
     path = write_workflow(

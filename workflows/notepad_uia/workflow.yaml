@@ -8,6 +8,7 @@ steps:
     args: ["assets\\automation_hub_m2.txt"]
     wait_for_exit: false
     process_alias: notepad_m2
+    timeout: 10
     expect:
       type: uia_exists
       target:
@@ -21,10 +22,23 @@ steps:
             control:
               control_type: Document
               class_name: RichEditD2DPT
+          - type: uia
+            process: notepad_m2
+            allow_process_handoff: true
+            window:
+              title_contains: automation_hub_m2.txt
+              class_name: Notepad
+            control:
+              control_type: Edit
+              automation_id: "15"
+              class_name: Edit
 
   - id: type_test_text
     action: type_text
     text: Hello Automation Hub
+    timeout: 10
+    retry: 1
+    retry_interval: 0.2
     target:
       strategies:
         - type: uia
@@ -35,12 +49,52 @@ steps:
           control:
             control_type: Document
             class_name: RichEditD2DPT
+        - type: uia
+          process: notepad_m2
+          window:
+            title_contains: automation_hub_m2.txt
+            class_name: Notepad
+          control:
+            control_type: Edit
+            automation_id: "15"
+            class_name: Edit
     expect:
       type: uia_text_equals
       value: Hello Automation Hub
 
+  - id: restore_test_text
+    action: type_text
+    text: Automation Hub M2 baseline
+    timeout: 10
+    retry: 1
+    retry_interval: 0.2
+    target:
+      strategies:
+        - type: uia
+          process: notepad_m2
+          window:
+            title_contains: automation_hub_m2.txt
+            class_name: Notepad
+          control:
+            control_type: Document
+            class_name: RichEditD2DPT
+        - type: uia
+          process: notepad_m2
+          window:
+            title_contains: automation_hub_m2.txt
+            class_name: Notepad
+          control:
+            control_type: Edit
+            automation_id: "15"
+            class_name: Edit
+    expect:
+      type: uia_text_equals
+      value: Automation Hub M2 baseline
+
   - id: close_test_tab
-    action: click
+    action: close_window
+    discard_changes: true
+    timeout: 10
     target:
       strategies:
         - type: uia
@@ -51,6 +105,11 @@ steps:
           control:
             control_type: Button
             automation_id: CloseButton
+        - type: uia
+          process: notepad_m2
+          window:
+            title_contains: automation_hub_m2.txt
+            class_name: Notepad
     expect:
       type: uia_disappeared
       target:

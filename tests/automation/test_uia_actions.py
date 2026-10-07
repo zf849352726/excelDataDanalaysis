@@ -24,15 +24,29 @@ class FakeValue:
         self.CurrentValue = value
 
 
-class FakeElement:
-    def __init__(self, control_type: str) -> None:
-        self.element_info = SimpleNamespace(control_type=control_type)
-        self.iface_invoke = FakeInvoke()
-        self.iface_value = FakeValue()
+class FakeWindow:
+    def __init__(self) -> None:
         self.closed = False
 
-    def close(self) -> None:
+    def Close(self) -> None:
         self.closed = True
+
+
+class FakeElement:
+    def __init__(self, control_type: str, automation_id: str = "") -> None:
+        self.element_info = SimpleNamespace(
+            control_type=control_type, automation_id=automation_id
+        )
+        self.iface_invoke = FakeInvoke()
+        self.iface_value = FakeValue()
+        self.iface_window = FakeWindow()
+        self.children = []
+
+    def top_level_parent(self):
+        return self
+
+    def descendants(self):
+        return list(self.children)
 
 
 def target_for(element: FakeElement) -> LocatorResult:
@@ -40,7 +54,7 @@ def target_for(element: FakeElement) -> LocatorResult:
         True,
         "uia",
         element=element,
-        metadata={"automation_id": "target"},
+        metadata={"automation_id": "target", "window_is_new": True},
     )
 
 
@@ -88,7 +102,7 @@ def test_type_text_uses_semantic_set_value() -> None:
 
 
 def test_close_window_requires_window_target() -> None:
-    with pytest.raises(ActionFailed, match="Window"):
+    with pytest.raises(ActionFailed, match="CloseButton"):
         CloseWindowAction().execute(
             Step("close", "close_window"),
             ExecutionContext(),
@@ -103,4 +117,29 @@ def test_close_window_closes_only_resolved_window() -> None:
         Step("close", "close_window"), ExecutionContext(), target_for(element)
     )
 
-    assert element.closed
+    assert element.iface_window.closed
+
+
+def test_close_window_invokes_resolved_document_close_button() -> None:
+    element = FakeElement("Button", "CloseButton")
+
+    CloseWindowAction().execute(
+        Step("close", "close_window"), ExecutionContext(), target_for(element)
+    )
+
+    assert element.iface_invoke.called
+
+
+def test_close_window_discards_only_declared_save_prompt() -> None:
+    element = FakeElement("Window")
+    discard = FakeElement("Button", "CommandButton_7")
+    element.children = [discard]
+
+    CloseWindowAction().execute(
+        Step("close", "close_window", {"discard_changes": True}),
+        ExecutionContext(),
+        target_for(element),
+    )
+
+    assert element.iface_window.closed
+    assert discard.iface_invoke.called

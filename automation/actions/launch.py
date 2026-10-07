@@ -64,6 +64,13 @@ class LaunchAction:
                 return ActionResult.cancelled(
                     f"Cancelled while waiting for '{program}'", metadata=metadata
                 )
+            if context.is_timed_out:
+                self._stop_owned_process(process)
+                return ActionResult.failed(
+                    f"Timed out while waiting for '{program}'",
+                    error_type="StepTimeout",
+                    metadata=metadata,
+                )
 
             exit_code = process.poll()
             if exit_code is not None:
@@ -78,7 +85,13 @@ class LaunchAction:
                     f"'{program}' exited with code 0", metadata=metadata
                 )
 
-            context.cancellation.wait(self._POLL_INTERVAL_SECONDS)
+            remaining = context.remaining_seconds()
+            interval = (
+                self._POLL_INTERVAL_SECONDS
+                if remaining is None
+                else min(self._POLL_INTERVAL_SECONDS, remaining)
+            )
+            context.cancellation.wait(interval)
 
     def _stop_owned_process(self, process: subprocess.Popen[Any]) -> None:
         if process.poll() is not None:

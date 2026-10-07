@@ -8,6 +8,7 @@ from typing import Any, Mapping
 from automation.engine.errors import (
     AmbiguousTarget,
     TargetNotFound,
+    StepTimeout,
     WorkflowCancelled,
 )
 from automation.engine.models import ExecutionContext
@@ -34,7 +35,7 @@ class LocatorChain:
     def resolve(
         self, target: Mapping[str, Any], context: ExecutionContext
     ) -> LocatorResult:
-        deadline = time.monotonic() + self._timeout_seconds
+        deadline = context.deadline or time.monotonic() + self._timeout_seconds
         attempts: list[Mapping[str, Any]] = []
         while True:
             result = self.locate_once(target, context, attempts=attempts)
@@ -43,10 +44,16 @@ class LocatorChain:
             if context.cancellation.is_cancelled:
                 raise WorkflowCancelled("Target resolution cancelled")
             if time.monotonic() >= deadline:
+                if context.deadline is not None:
+                    raise StepTimeout(
+                        f"Target resolution exceeded the step timeout; attempts={attempts}"
+                    )
                 raise TargetNotFound(
                     f"No locator strategy resolved the target; attempts={attempts}"
                 )
-            context.cancellation.wait(self._poll_interval_seconds)
+            context.cancellation.wait(
+                min(self._poll_interval_seconds, max(0.0, deadline - time.monotonic()))
+            )
 
     def locate_once(
         self,

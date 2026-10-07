@@ -14,13 +14,23 @@ from automation.engine.models import Step, Workflow
 
 
 _WORKFLOW_FIELDS = {"name", "version", "steps"}
-_COMMON_STEP_FIELDS = {"id", "name", "action", "target", "expect"}
+_COMMON_STEP_FIELDS = {
+    "id",
+    "name",
+    "action",
+    "target",
+    "expect",
+    "timeout",
+    "retry",
+    "retry_interval",
+    "on_fail",
+}
 _ACTION_FIELDS = {
     "wait": {"seconds"},
     "launch": {"program", "args", "wait_for_exit", "process_alias"},
     "click": set(),
     "type_text": {"text"},
-    "close_window": set(),
+    "close_window": {"discard_changes"},
 }
 _TARGET_ACTIONS = {"click", "type_text", "close_window"}
 _UIA_STRATEGY_FIELDS = {
@@ -122,8 +132,21 @@ class WorkflowLoader:
                 )
 
         expectation = self._load_optional_expectation(
-            data.get("expect"), f"{location}.expect", target is not None
+            data.get("expect"), f"{location}.expect", target
         )
+        timeout = self._load_optional_timeout(data.get("timeout"), f"{location}.timeout")
+        retry = self._load_retry(data.get("retry", 0), f"{location}.retry")
+        retry_interval = self._require_bounded_number(
+            data.get("retry_interval", 0.0),
+            f"{location}.retry_interval",
+            0.0,
+            3600.0,
+        )
+        on_fail = data.get("on_fail", "stop")
+        if on_fail not in {"stop", "continue"}:
+            raise WorkflowValidationError(
+                f"{location}.on_fail must be either 'stop' or 'continue'"
+            )
         return Step(
             id=step_id,
             name=name,
@@ -131,6 +154,10 @@ class WorkflowLoader:
             parameters=parameters,
             target=target,
             expectation=expectation,
+            timeout=timeout,
+            retry=retry,
+            retry_interval=retry_interval,
+            on_fail=on_fail,
         )
 
     def _load_action_parameters(
@@ -144,6 +171,13 @@ class WorkflowLoader:
             return {
                 "text": self._require_string(data.get("text"), f"{location}.text")
             }
+        if action_name == "close_window":
+            discard_changes = data.get("discard_changes", False)
+            if not isinstance(discard_changes, bool):
+                raise WorkflowValidationError(
+                    f"{location}.discard_changes must be a boolean"
+                )
+            return {"discard_changes": discard_changes}
         return {}
 
     def _load_wait_parameters(
@@ -321,7 +355,10 @@ class WorkflowLoader:
         }
 
     def _load_optional_expectation(
-        self, value: Any, location: str, has_action_target: bool
+        self,
+        value: Any,
+        location: str,
+        action_target: Mapping[str, Any] | None,
     ) -> Mapping[str, Any] | None:
         if value is None:
             return None
@@ -330,9 +367,14 @@ class WorkflowLoader:
             data.get("type"), f"{location}.type"
         )
         allowed_by_type = {
+            "window_exists": {"type", "target"},
+            "window_disappeared": {"type", "target"},
             "uia_exists": {"type", "target"},
             "uia_text_equals": {"type", "target", "value"},
             "uia_disappeared": {"type", "target"},
+            "image_exists": {"type", "target"},
+            "image_disappeared": {"type", "target"},
+            "file_exists": {"type", "path"},
         }
         allowed = allowed_by_type.get(expectation_type)
         if allowed is None:
@@ -344,14 +386,30 @@ class WorkflowLoader:
         self._reject_unknown_fields(data, allowed, location)
 
         target = self._load_optional_target(data.get("target"), f"{location}.target")
-        if expectation_type in {"uia_exists", "uia_disappeared"} and target is None:
+        target_expectations = {
+            "window_exists",
+            "window_disappeared",
+            "uia_exists",
+            "uia_disappeared",
+            "image_exists",
+            "image_disappeared",
+        }
+        if expectation_type in target_expectations and target is None:
             raise WorkflowValidationError(
                 f"{location}.target is required for '{expectation_type}'"
             )
-        if expectation_type == "uia_text_equals" and target is None and not has_action_target:
-            raise WorkflowValidationError(
-                f"{location} requires a target because the action has no target"
-            )
+        if expectation_type == "uia_text_equals" and target is None:
+            if action_target is None:
+                raise WorkflowValidationError(
+                    f"{location} requires a target because the action has no target"
+                )
+            if any(
+                strategy["type"] != "uia"
+                for strategy in action_target["strategies"]
+            ):
+                raise WorkflowValidationError(
+                    f"{location} requires a UIA action target or an explicit UIA target"
+                )
 
         expectation: dict[str, Any] = {
             "type": expectation_type,
@@ -361,7 +419,57 @@ class WorkflowLoader:
             expectation["value"] = self._require_string(
                 data.get("value"), f"{location}.value"
             )
+        if expectation_type == "file_exists":
+            path = self._require_non_empty_string(data.get("path"), f"{location}.path")
+            file_path = Path(path)
+            if file_path.is_absolute() or ".." in file_path.parts:
+                raise WorkflowValidationError(
+                    f"{location}.path must be workflow-relative without '..'"
+                )
+            expectation["path"] = path
+        self._validate_expectation_target(expectation_type, target, location)
         return expectation
+
+    def _validate_expectation_target(
+        self,
+        expectation_type: str,
+        target: Mapping[str, Any] | None,
+        location: str,
+    ) -> None:
+        if target is None:
+            return
+        strategies = target["strategies"]
+        if expectation_type.startswith("window_"):
+            if any(
+                strategy["type"] != "uia" or strategy["control"] is not None
+                for strategy in strategies
+            ):
+                raise WorkflowValidationError(
+                    f"{location}.target must contain only UIA window strategies"
+                )
+        elif expectation_type.startswith("uia_"):
+            if any(strategy["type"] != "uia" for strategy in strategies):
+                raise WorkflowValidationError(
+                    f"{location}.target must contain only UIA strategies"
+                )
+        elif expectation_type.startswith("image_"):
+            if any(strategy["type"] != "image" for strategy in strategies):
+                raise WorkflowValidationError(
+                    f"{location}.target must contain only image strategies"
+                )
+
+    def _load_optional_timeout(self, value: Any, location: str) -> float | None:
+        if value is None:
+            return None
+        return self._require_bounded_number(value, location, 0.001, 3600.0)
+
+    @staticmethod
+    def _load_retry(value: Any, location: str) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 100:
+            raise WorkflowValidationError(
+                f"{location} must be an integer from 0 to 100"
+            )
+        return value
 
     @staticmethod
     def _require_mapping(value: Any, location: str) -> Mapping[str, Any]:
