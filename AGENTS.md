@@ -643,10 +643,15 @@ Do not:
 
 - force-push
 - amend unrelated commits
-- push without request
 - delete branches/tags casually
 
-When asked to commit, prefer small coherent commits.
+After any code change is implemented and validated successfully, create a coherent Git commit and push the current development branch to its configured GitHub remote before reporting the work complete, unless the user explicitly says not to commit or not to push.
+
+For milestone/phase work, the milestone checkpoint commit and GitHub push are mandatory before the milestone is considered closed or work begins on the next milestone.
+
+Use one clear, coherent milestone commit by default. Additional intermediate commits are optional when they improve safety or reviewability.
+
+Do not push unrelated branches or tags automatically. Push only the current development branch unless the task explicitly requires another ref.
 
 Roadmap-specific commit boundaries belong in `plan.md` or the current task, not here.
 
@@ -681,9 +686,13 @@ If the active task or `plan.md` says to implement one milestone:
 ```text
 implement that milestone
 → validate
+→ create a Git milestone commit
+→ push the current development branch to GitHub
 → report
 → stop
 ```
+
+A milestone is not considered closed until its validated code and milestone documentation changes have been committed and the current development branch has been pushed successfully to GitHub.
 
 Wait for confirmation before entering the next milestone.
 
