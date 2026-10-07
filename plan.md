@@ -22,9 +22,9 @@ price\static\
 The long-term product direction is:
 
 ```text
-PyQt GUI / Codex / DSH
-          │
-          ↓
+Standalone PyQt5 GUI / Codex / DSH
+                 │
+                 ↓
 AutomationService
           │
           ↓
@@ -40,7 +40,7 @@ Workflow Engine
        Windows
 ```
 
-The V2 system should gradually replace filename-driven execution while preserving the current supported legacy workflows and existing business features.
+The `automation-v2` branch should evolve into a standalone Automation Hub product that does not depend on the legacy business application. The complete integrated application, including the old business features, Legacy Automation, and the M5 Automation V2 tab, is preserved on the `legacy-integrated` branch from the exact M5 checkpoint.
 
 ---
 
@@ -56,10 +56,11 @@ The system should evolve toward these capabilities:
 6. Retry, timeout, cancellation, pause/resume
 7. Legacy workflow migration
 8. Existing PyQt GUI integration
-9. Target Picker / Step Capture
-10. Excel/WPS native adapters
-11. MCP exposure for Codex / DSH / ChatGPT
-12. OCR / AI Vision only after deterministic layers are stable
+9. Standalone PyQt5 application split
+10. Target Picker / Step Capture
+11. Excel/WPS native adapters
+12. MCP exposure for Codex / DSH / ChatGPT
+13. OCR / AI Vision only after deterministic layers are stable
 
 The intended automation preference is:
 
@@ -130,8 +131,10 @@ The expected direction is:
 
 ```text
 automation/
+├── __main__.py
 ├── engine/
 ├── actions/
+├── gui/
 ├── locators/
 ├── verification/
 ├── adapters/
@@ -425,7 +428,68 @@ Wire existing automation UI concepts to V2:
 
 ---
 
-# 10a. Milestone 5b — Pause, Resume, and Loop Control
+# 10a. Milestone 5S — Standalone Product Split
+
+**Status: Completed — 2026-10-08**
+
+## Goal
+
+Split Automation Hub V2 out of the legacy PyQt application as a standalone product while preserving the complete M5 integrated application on a dedicated branch.
+
+## Branch Strategy
+
+- `automation-v2` becomes the standalone Automation Hub development branch.
+- create `legacy-integrated` from the exact M5 completion commit `ae5e1d9` and push that branch before removing legacy application files from `automation-v2`
+- `legacy-integrated` preserves the old business application, Legacy Automation, and the Automation V2 tab delivered by M5
+- do not rewrite M1-M5 history, force-push, or move the `legacy-integrated` branch away from `ae5e1d9` during this split
+
+## Deliverables and Order
+
+1. Verify that `ae5e1d9` is the M5 completion commit, create `legacy-integrated` at that exact commit, and push it to GitHub.
+2. Add a standalone application entry point so Automation Hub can be started with:
+
+   ```text
+   python -m automation
+   ```
+
+3. Add a standalone Automation Hub main window that owns the existing V2 panel and worker lifecycle without importing or launching the legacy `main.py` application.
+4. Enforce that the `automation` package has no imports from:
+
+   ```text
+   main.py
+   final_cal/
+   price/moudle/
+   ui/
+   other legacy business modules
+   ```
+
+5. Move the original M3 migration inputs required for deterministic reproduction into `tests/automation/fixtures`. Update migration tests to use those fixtures and retain the migrated workflow assets under `workflows/legacy`.
+6. After the branch and migration assets are verified, remove legacy application code and assets that the standalone V2 product no longer needs from `automation-v2`.
+7. Remove dependencies used only by the deleted legacy application. Keep optional desktop automation dependencies isolated where practical.
+8. Preserve and revalidate all M1-M5 V2 behavior, then create the M5S milestone commit and push `automation-v2` to GitHub.
+
+The legacy `main.py` import smoke test belongs to `legacy-integrated` after the split. It is not part of the standalone `automation-v2` test suite. M1-M5 acceptance on `automation-v2` refers to the retained V2 tests and capabilities.
+
+## Acceptance
+
+- `python -m automation` starts the standalone PyQt5 application without importing the legacy application
+- the GUI lists workflows and can run `basic_test`
+- stop cancels an active workflow while the GUI remains responsive
+- `notepad_uia` succeeds in the supported Windows environment and closes only the run-owned Notepad target
+- all retained M1-M5 V2 automated tests pass
+- an import-boundary test confirms that `automation` does not import `main`, `final_cal`, `price.moudle`, `ui`, or other legacy business modules
+- M3 migration output remains reproducible from the committed test fixtures, and the migrated workflow assets remain intact
+- `legacy-integrated` exists locally and on GitHub at `ae5e1d9`, preserving the complete integrated application
+- M1-M5 commit history is unchanged; no force push is used
+- the M5S changes are committed and `automation-v2` is pushed successfully to GitHub
+
+## Out of Scope
+
+Do not implement pause, resume, run counts, loop mode, Target Picker, MCP, OCR, or AI Vision in this milestone.
+
+---
+
+# 10b. Milestone 5b — Pause, Resume, and Loop Control
 
 ## Goal
 
@@ -699,6 +763,8 @@ M4 Verification Expansion / Retry
    ↓
 M5 PyQt5 Single-Run Integration
    ↓
+M5S Standalone Product Split
+   ↓
 M5b Pause / Resume / Loop Control
    ↓
 M6 Target Picker
@@ -718,7 +784,7 @@ A later milestone may be pulled forward only when there is a concrete need and d
 
 ## Current state
 
-**Milestone 5 — PyQt5 Single-Run Integration is complete. Milestone 5b is pending review and is not active.**
+**Milestone 5S — Standalone Product Split is complete. Milestone 5b is pending review and is not active.**
 
 Milestone 1 is complete and committed locally as `5c1f9fb`.
 
@@ -817,7 +883,30 @@ Validation completed with the documented Python 3.11 environment:
 - `automation` imports without loading PyQt5; the Qt dependency remains isolated under `automation.gui`
 - compile checks and `git diff --check` pass
 
-M5 intentionally provides one run at a time. Pause, resume, run counts, and loop mode remain in Milestone 5b.
+M5 intentionally provides one run at a time. Pause, resume, run counts, and loop mode remain deferred to Milestone 5b after the standalone product split.
+
+Milestone 5S delivered:
+
+- `legacy-integrated` created locally and pushed to GitHub at the exact M5 commit `ae5e1d9`
+- a standalone `python -m automation` entry point and Automation Hub PyQt5 main window
+- standalone GUI ownership of the V2 panel, worker lifecycle, workflow list, run-once, stop, progress, and logs
+- an enforced import boundary between `automation` and the removed legacy business modules
+- M3 source images moved into committed test fixtures with byte-identical hashes
+- migrated workflows and their runtime assets preserved under `workflows/legacy`
+- legacy business code, sample workbooks, old UI files, and old packaging entry points removed from `automation-v2`
+- project metadata and documentation updated for the standalone product
+- legacy-only dependencies removed from the standalone dependency set
+
+Validation completed with the documented Python 3.11 environment:
+
+- full default V2 test suite: 80 passed, 2 supervised desktop integration tests skipped by default
+- opt-in Notepad UI integration: 5/5 verified runs in the supported Windows environment
+- the standalone application entry point remained running when launched with `python -m automation` and shut down cleanly in deterministic Qt tests
+- GUI integration tests verified workflow discovery, `basic_test` execution, responsive cancellation, and worker cleanup
+- static and runtime import checks found no dependency from `automation` to `main`, `config`, `final_cal`, `price`, or `ui`
+- M3 migration reproduction passed from the new fixtures, whose SHA-256 hashes match the original source assets
+- `pip check`, compile checks, and `git diff --check` pass
+- local and remote `legacy-integrated` both resolve to `ae5e1d9`; M1-M5 history remains unchanged
 
 Wait for review before starting Milestone 5b.
 

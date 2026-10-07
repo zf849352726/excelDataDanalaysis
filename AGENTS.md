@@ -21,26 +21,13 @@ If `plan.md` proposes work outside the user's requested scope, do not implement 
 
 ---
 
-# 2. Protect the Existing Application
+# 2. Standalone Product Boundary
 
-The repository contains working legacy business logic and automation.
+The `automation-v2` branch contains the standalone Automation Hub product.
 
-Do not casually delete, rename, or rewrite:
+The complete M5 integrated application is preserved on the `legacy-integrated` branch at commit `ae5e1d9`. Do not move or rewrite that branch casually.
 
-```text
-main.py
-config.py
-price\
-price\static\
-final_cal\
-ui\
-```
-
-Existing images and task folders are user assets.
-
-Treat legacy automation as migration input.
-
-Prefer additive V2 development under:
+Product development on `automation-v2` belongs under:
 
 ```text
 automation\
@@ -49,13 +36,17 @@ tests\automation\
 runs\
 ```
 
-The legacy typo:
+The standalone product must not depend on legacy application modules such as:
 
 ```text
-price\moudle
+main.py
+config.py
+final_cal\
+price\moudle\
+ui\
 ```
 
-may be depended on by imports. Do not rename it unless migration is explicit and verified.
+Historical legacy code and assets should be recovered from `legacy-integrated` rather than copied back into the standalone branch.
 
 ---
 
@@ -414,7 +405,7 @@ Legacy migration should:
 - parse legacy filename semantics
 - generate V2 workflow data
 - copy assets into the new workflow directory
-- preserve source task folders
+- preserve deterministic source fixtures under `tests\automation\fixtures`
 
 Known legacy defects must not be copied into V2:
 

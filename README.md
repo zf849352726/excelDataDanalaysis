@@ -1,8 +1,8 @@
-# excel_data / Automation Hub V2
+# Automation Hub V2
 
-This repository contains an existing PyQt-based Excel/WPS/data-processing desktop application and a legacy desktop automation subsystem.
+This branch contains the standalone Automation Hub V2 desktop application.
 
-Automation Hub V2 is being introduced incrementally without replacing the existing application in one rewrite.
+The complete legacy business application with the M5 Automation V2 tab is preserved on the `legacy-integrated` branch.
 
 ## Project documents
 
@@ -37,21 +37,13 @@ If the configured PyPI mirror does not provide a required wheel, use the officia
 python -m pip install -i https://pypi.org/simple -e ".[dev]"
 ```
 
-The legacy application may contain code created under older Python environments; compatibility should be verified incrementally rather than rewritten pre-emptively.
-
-## Existing application
-
-Legacy application entry point:
+## Start the application
 
 ```powershell
-python main.py
+python -m automation
 ```
 
-A Python 3.11 import smoke check is:
-
-```powershell
-python -c "import main; print('import main: OK')"
-```
+The application discovers workflows from the repository's `workflows` directory. Workflow execution remains available through the GUI without importing the historical business application.
 
 ## Tests
 

@@ -87,10 +87,11 @@ def test_committed_workflows_are_reproducible_from_active_legacy_tasks(
     tmp_path: Path,
 ) -> None:
     project_root = Path(__file__).resolve().parents[2]
+    fixture_root = Path(__file__).parent / "fixtures" / "legacy"
     for task_name in ("auto_click", "click_next_page"):
         generated = tmp_path / task_name
         result = migrate_task_directory(
-            project_root / "price" / "static" / task_name, generated
+            fixture_root / task_name, generated
         )
         committed = project_root / "workflows" / "legacy" / task_name
 
