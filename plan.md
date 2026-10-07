@@ -143,6 +143,8 @@ The actual module boundaries should emerge milestone by milestone.
 
 # 5. Milestone 0 — Baseline and Safety Point
 
+**Status: Completed — 2026-10-07**
+
 ## Goal
 
 Establish a safe starting point before structural changes.
@@ -164,6 +166,8 @@ Establish a safe starting point before structural changes.
 ---
 
 # 6. Milestone 1 — Core Workflow Engine
+
+**Status: Ready — current active milestone**
 
 ## Goal
 
