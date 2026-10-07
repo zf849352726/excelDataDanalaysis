@@ -18,6 +18,7 @@ from docx.shared import Cm
 import ctypes
 from config import Config
 from price.moudle.automator import Automator
+from automation.gui import AutomationPanel
 from pathlib import Path
 import re
 from final_cal.FileManager import FileManager
@@ -177,6 +178,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pic_file_list = None
         self.pic_folder_name = ''
 
+        # Automation Hub V2 runs on its own QThread and updates this panel by signals.
+        self.automation_v2_panel = AutomationPanel(
+            Path(__file__).resolve().parent / "workflows", self
+        )
+        self.tabWidget.addTab(self.automation_v2_panel, "自动化 V2")
+
     def on_timer_timeout(self):
         """定时器触发时执行的函数"""
         self.run_task_logic()  # 运行任务
@@ -311,7 +318,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.hide_to_right()
             event.ignore()  # 忽略关闭事件，防止程序退出
         else:
-            event.accept()  # 正常关闭窗口
+            if self.automation_v2_panel.shutdown():
+                self.tool_button_window.close()
+                event.accept()  # 正常关闭窗口
+            else:
+                event.ignore()
 
     def checkMouseDistance(self):
         # 获取鼠标的当前坐标

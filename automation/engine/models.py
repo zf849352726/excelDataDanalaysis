@@ -143,6 +143,26 @@ class WorkflowResult:
     steps: tuple[StepResult, ...]
 
 
+class ExecutionEventType(str, Enum):
+    """Observable workflow lifecycle events emitted by the executor."""
+
+    WORKFLOW_STARTED = "workflow_started"
+    STEP_STARTED = "step_started"
+    STEP_COMPLETED = "step_completed"
+    WORKFLOW_COMPLETED = "workflow_completed"
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionEvent:
+    type: ExecutionEventType
+    workflow_name: str
+    step_id: str | None = None
+    action: str | None = None
+    step_index: int | None = None
+    step_count: int | None = None
+    result: ActionResult | WorkflowResult | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class VerificationResult:
     passed: bool

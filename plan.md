@@ -378,6 +378,8 @@ Support:
 
 # 10. Milestone 5 — PyQt5 Single-Run Integration
 
+**Status: Completed — 2026-10-07**
+
 ## Goal
 
 Reconnect the new engine to the existing PyQt5 application without moving execution back into the GUI thread. Do not rewrite the GUI in C++ or migrate Qt bindings in this milestone.
@@ -716,7 +718,7 @@ A later milestone may be pulled forward only when there is a concrete need and d
 
 ## Current state
 
-**Milestone 4 — Verification Expansion and Retry is complete. Milestone 5 is pending review and is not active.**
+**Milestone 5 — PyQt5 Single-Run Integration is complete. Milestone 5b is pending review and is not active.**
 
 Milestone 1 is complete and committed locally as `5c1f9fb`.
 
@@ -797,7 +799,27 @@ Validation completed with the documented Python 3.11 environment:
 
 The migrated legacy desktop workflows remain supervised opt-in runs and still report `executed_unverified` when no expectation is declared.
 
-Wait for review before starting Milestone 5.
+Milestone 5 delivered:
+
+- GUI-independent workflow discovery, single-run ownership, busy-state rejection, and cooperative stop through `AutomationService`
+- explicit executor lifecycle events for workflow and step start/completion
+- a dedicated PyQt5 `QObject` worker moved to a persistent `QThread`
+- queued worker-to-GUI signals for status, progress, logs, and terminal results
+- a new Automation V2 tab with workflow list, step list, run-once, active-run stop, progress, and logs
+- explicit worker-thread shutdown during normal main-window close
+- preservation of the existing legacy automation controls and screenshot button
+
+Validation completed with the documented Python 3.11 environment:
+
+- full default test suite: 78 passed, 2 supervised desktop integration tests skipped by default
+- deterministic Qt integration test kept the main event loop responsive during a five-second wait and cancelled the active run
+- offscreen `MainWindow` smoke test loaded all four current workflows in the V2 tab and shut down its worker cleanly
+- `automation` imports without loading PyQt5; the Qt dependency remains isolated under `automation.gui`
+- compile checks and `git diff --check` pass
+
+M5 intentionally provides one run at a time. Pause, resume, run counts, and loop mode remain in Milestone 5b.
+
+Wait for review before starting Milestone 5b.
 
 ---
 

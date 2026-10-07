@@ -5,12 +5,14 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import replace
-from typing import Any
+from typing import Any, Callable
 
 from automation.engine.errors import AutomationError, StepTimeout, WorkflowCancelled
 from automation.engine.interfaces import TargetResolver, VerificationService
 from automation.engine.models import (
     ActionResult,
+    ExecutionEvent,
+    ExecutionEventType,
     ExecutionContext,
     ExecutionStatus,
     Step,
@@ -36,7 +38,10 @@ class WorkflowExecutor:
         self._verification_service = verification_service
 
     def execute(
-        self, workflow: Workflow, context: ExecutionContext | None = None
+        self,
+        workflow: Workflow,
+        context: ExecutionContext | None = None,
+        event_handler: Callable[[ExecutionEvent], None] | None = None,
     ) -> WorkflowResult:
         execution_context = context or ExecutionContext()
         if execution_context.working_directory is None and workflow.source_path:
@@ -46,7 +51,26 @@ class WorkflowExecutor:
         step_results: list[StepResult] = []
 
         logger.info("workflow_started", extra={"workflow": workflow.name})
-        for step in workflow.steps:
+        self._emit(
+            event_handler,
+            ExecutionEvent(
+                ExecutionEventType.WORKFLOW_STARTED,
+                workflow.name,
+                step_count=len(workflow.steps),
+            ),
+        )
+        for step_index, step in enumerate(workflow.steps, start=1):
+            self._emit(
+                event_handler,
+                ExecutionEvent(
+                    ExecutionEventType.STEP_STARTED,
+                    workflow.name,
+                    step_id=step.id,
+                    action=step.action,
+                    step_index=step_index,
+                    step_count=len(workflow.steps),
+                ),
+            )
             if execution_context.cancellation.is_cancelled:
                 result = ActionResult.cancelled()
             else:
@@ -64,6 +88,18 @@ class WorkflowExecutor:
                     "error": result.message if result.status is ExecutionStatus.FAILED else None,
                 },
             )
+            self._emit(
+                event_handler,
+                ExecutionEvent(
+                    ExecutionEventType.STEP_COMPLETED,
+                    workflow.name,
+                    step_id=step.id,
+                    action=step.action,
+                    step_index=step_index,
+                    step_count=len(workflow.steps),
+                    result=result,
+                ),
+            )
 
             if result.status is ExecutionStatus.CANCELLED:
                 break
@@ -80,11 +116,38 @@ class WorkflowExecutor:
             final_status = ExecutionStatus.VERIFIED
         else:
             final_status = ExecutionStatus.EXECUTED_UNVERIFIED
+        workflow_result = WorkflowResult(
+            workflow.name, final_status, tuple(step_results)
+        )
         logger.info(
             "workflow_completed",
             extra={"workflow": workflow.name, "status": final_status.value},
         )
-        return WorkflowResult(workflow.name, final_status, tuple(step_results))
+        self._emit(
+            event_handler,
+            ExecutionEvent(
+                ExecutionEventType.WORKFLOW_COMPLETED,
+                workflow.name,
+                step_count=len(workflow.steps),
+                result=workflow_result,
+            ),
+        )
+        return workflow_result
+
+    @staticmethod
+    def _emit(
+        event_handler: Callable[[ExecutionEvent], None] | None,
+        event: ExecutionEvent,
+    ) -> None:
+        if event_handler is None:
+            return
+        try:
+            event_handler(event)
+        except Exception:
+            logger.exception(
+                "execution_event_handler_failed",
+                extra={"workflow": event.workflow_name, "event": event.type.value},
+            )
 
     def _execute_step(
         self, workflow: Workflow, step: Step, context: ExecutionContext

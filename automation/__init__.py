@@ -4,6 +4,8 @@ from automation.actions import create_default_registry
 from automation.engine import (
     ActionRegistry,
     ActionResult,
+    ExecutionEvent,
+    ExecutionEventType,
     CancellationToken,
     ExecutionContext,
     ExecutionStatus,
@@ -21,6 +23,8 @@ from automation.runtime import create_default_executor
 __all__ = [
     "ActionRegistry",
     "ActionResult",
+    "ExecutionEvent",
+    "ExecutionEventType",
     "CancellationToken",
     "ExecutionContext",
     "ExecutionStatus",

@@ -19,6 +19,8 @@ from automation.engine.executor import WorkflowExecutor
 from automation.engine.loader import WorkflowLoader
 from automation.engine.models import (
     ActionResult,
+    ExecutionEvent,
+    ExecutionEventType,
     ExecutionContext,
     ExecutionStatus,
     ProcessReference,
@@ -36,6 +38,8 @@ __all__ = [
     "ActionRegistrationError",
     "ActionFailed",
     "ActionResult",
+    "ExecutionEvent",
+    "ExecutionEventType",
     "AmbiguousTarget",
     "AutomationError",
     "CancellationToken",
