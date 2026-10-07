@@ -1,0 +1,33 @@
+name: auto_click
+version: 1
+steps:
+- id: step_000_click_xlsxfile
+  name: click_xlsxfile
+  action: click
+  target:
+    strategies:
+    - type: image
+      template: assets/0-click_xlsxfile.png
+      threshold: 0.8
+      scales:
+      - 0.9
+      - 1.0
+      - 1.1
+      ambiguity_margin: 0.02
+- id: step_001_click_xlsxfile1
+  name: click_xlsxfile1
+  action: click
+  target:
+    strategies:
+    - type: image
+      template: assets/1-click_xlsxfile1.png
+      threshold: 0.8
+      scales:
+      - 0.9
+      - 1.0
+      - 1.1
+      ambiguity_margin: 0.02
+- id: step_002_sleep_10
+  name: sleep_10
+  action: wait
+  seconds: 10.0

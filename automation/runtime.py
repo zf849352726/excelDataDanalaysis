@@ -2,7 +2,7 @@
 
 from automation.actions import create_default_registry
 from automation.engine.executor import WorkflowExecutor
-from automation.locators import LocatorChain, LocatorRegistry, UIALocator
+from automation.locators import ImageLocator, LocatorChain, LocatorRegistry, UIALocator
 from automation.verification import (
     DefaultVerificationService,
     UIADisappearedVerifier,
@@ -15,6 +15,7 @@ from automation.verification import (
 def create_default_executor() -> WorkflowExecutor:
     locator_registry = LocatorRegistry()
     locator_registry.register("uia", UIALocator())
+    locator_registry.register("image", ImageLocator())
     locator_chain = LocatorChain(locator_registry)
 
     verifier_registry = VerificationRegistry()

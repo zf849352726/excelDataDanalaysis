@@ -1,0 +1,16 @@
+name: click_next_page
+version: 1
+steps:
+- id: step_000_click_next
+  name: click_next
+  action: click
+  target:
+    strategies:
+    - type: image
+      template: assets/0-click_next.png
+      threshold: 0.8
+      scales:
+      - 0.9
+      - 1.0
+      - 1.1
+      ambiguity_margin: 0.02

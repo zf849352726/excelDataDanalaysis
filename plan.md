@@ -286,6 +286,8 @@ The supported validation environment closes this test tab without a save prompt.
 
 # 8. Milestone 3 — Image Locator and Legacy Migration
 
+**Status: Completed — 2026-10-07**
+
 ## Goal
 
 Add robust image fallback and move legacy tasks into the new workflow format.
@@ -712,7 +714,7 @@ A later milestone may be pulled forward only when there is a concrete need and d
 
 ## Current state
 
-**Milestone 2 — UIA Vertical Slice is complete. Milestone 3 is pending review and is not active.**
+**Milestone 3 — Image Locator and Legacy Migration is complete. Milestone 4 is pending review and is not active.**
 
 Milestone 1 is complete and committed locally as `5c1f9fb`.
 
@@ -749,7 +751,28 @@ Validation completed with the documented Python 3.11 environment:
 - `automation` imports without loading PyQt5
 - the test document is restored unchanged and no test tab remains open after validation
 
-Wait for review before starting Milestone 3.
+Milestone 3 delivered:
+
+- an image locator using `cv2.minMaxLoc`, actual confidence, configurable thresholds, declared scales, and ambiguity detection
+- image-backed clicks that use only coordinates returned by the current locator result
+- strict image strategy validation with workflow-relative template paths
+- a deterministic legacy filename parser and non-overwriting migration command
+- programmatically generated V2 workflows for `auto_click` and `click_next_page`
+- byte-for-byte asset copies while preserving all source task files
+- an explicitly enabled, supervised desktop test for migrated workflows
+
+Validation completed with the documented Python 3.11 environment:
+
+- full default test suite: 52 passed, 2 desktop integration tests skipped by default
+- generated workflows load through V2 and contain no implicit expectations
+- migrated workflow execution with controlled targets reports `executed_unverified`
+- all four copied PNG assets match their source SHA-256 hashes
+- committed migration output is reproducible from the active legacy task directories
+- `automation` imports without loading PyQt5
+
+The real migrated desktop workflows were not clicked during unattended validation. They are available through an opt-in test that requires `AUTOMATION_LEGACY_UI_TESTS=1` and human supervision, and it requires the final result to remain `executed_unverified`.
+
+Wait for review before starting Milestone 4.
 
 ---
 

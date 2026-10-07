@@ -43,3 +43,7 @@ class WorkflowCancelled(AutomationError):
 
 class VerificationFailed(AutomationError):
     """Raised when an action's declared expectation is not met."""
+
+
+class LegacyMigrationError(AutomationError):
+    """Raised when a legacy task cannot be migrated without guessing."""

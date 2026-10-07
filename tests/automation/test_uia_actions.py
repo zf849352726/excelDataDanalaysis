@@ -2,7 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from automation.actions.uia import ClickAction, CloseWindowAction, TypeTextAction
+from automation.actions import ClickAction
+from automation.actions.uia import CloseWindowAction, TypeTextAction
 from automation.engine import ActionFailed, ExecutionContext, ExecutionStatus, Step
 from automation.locators import LocatorResult
 
@@ -51,6 +52,25 @@ def test_click_uses_semantic_invoke() -> None:
     )
 
     assert element.iface_invoke.called
+    assert result.status is ExecutionStatus.EXECUTED_UNVERIFIED
+
+
+def test_click_uses_only_resolved_image_coordinates() -> None:
+    clicks: list[tuple[int, int]] = []
+    target = LocatorResult(
+        True,
+        "image",
+        x=42,
+        y=73,
+        confidence=0.97,
+        metadata={"template": "button.png"},
+    )
+
+    result = ClickAction(lambda x, y: clicks.append((x, y))).execute(
+        Step("click", "click"), ExecutionContext(), target
+    )
+
+    assert clicks == [(42, 73)]
     assert result.status is ExecutionStatus.EXECUTED_UNVERIFIED
 
 

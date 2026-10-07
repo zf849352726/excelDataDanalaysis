@@ -32,6 +32,13 @@ _UIA_STRATEGY_FIELDS = {
 }
 _UIA_WINDOW_FIELDS = {"title", "title_contains", "title_regex", "class_name"}
 _UIA_CONTROL_FIELDS = {"control_type", "name", "automation_id", "class_name"}
+_IMAGE_STRATEGY_FIELDS = {
+    "type",
+    "template",
+    "threshold",
+    "scales",
+    "ambiguity_margin",
+}
 
 
 class WorkflowLoader:
@@ -107,6 +114,12 @@ class WorkflowLoader:
             raise WorkflowValidationError(
                 f"{location}.target is not supported for action '{action_name}'"
             )
+        if action_name in {"type_text", "close_window"} and target is not None:
+            if any(strategy["type"] != "uia" for strategy in target["strategies"]):
+                raise WorkflowValidationError(
+                    f"{location}.target supports only UIA strategies for action "
+                    f"'{action_name}'"
+                )
 
         expectation = self._load_optional_expectation(
             data.get("expect"), f"{location}.expect", target is not None
@@ -189,21 +202,27 @@ class WorkflowLoader:
             raise WorkflowValidationError(f"{location}.strategies must be a non-empty list")
         return {
             "strategies": tuple(
-                self._load_uia_strategy(strategy, f"{location}.strategies[{index}]")
+                self._load_target_strategy(strategy, f"{location}.strategies[{index}]")
                 for index, strategy in enumerate(strategies)
             )
         }
 
-    def _load_uia_strategy(self, value: Any, location: str) -> Mapping[str, Any]:
+    def _load_target_strategy(self, value: Any, location: str) -> Mapping[str, Any]:
         data = self._require_mapping(value, location)
-        self._reject_unknown_fields(data, _UIA_STRATEGY_FIELDS, location)
         strategy_type = self._require_non_empty_string(
             data.get("type"), f"{location}.type"
         )
-        if strategy_type != "uia":
-            raise WorkflowValidationError(
-                f"{location}.type '{strategy_type}' is unsupported in Milestone 2"
-            )
+        if strategy_type == "uia":
+            return self._load_uia_strategy(data, location)
+        if strategy_type == "image":
+            return self._load_image_strategy(data, location)
+        raise WorkflowValidationError(
+            f"{location}.type '{strategy_type}' is unsupported; supported strategies: image, uia"
+        )
+
+    def _load_uia_strategy(self, value: Any, location: str) -> Mapping[str, Any]:
+        data = self._require_mapping(value, location)
+        self._reject_unknown_fields(data, _UIA_STRATEGY_FIELDS, location)
         process = self._require_non_empty_string(
             data.get("process"), f"{location}.process"
         )
@@ -242,6 +261,49 @@ class WorkflowLoader:
             "allow_process_handoff": allow_handoff,
             "window": window,
             "control": control,
+        }
+
+    def _load_image_strategy(
+        self, data: Mapping[str, Any], location: str
+    ) -> Mapping[str, Any]:
+        self._reject_unknown_fields(data, _IMAGE_STRATEGY_FIELDS, location)
+        template = self._require_non_empty_string(
+            data.get("template"), f"{location}.template"
+        )
+        template_path = Path(template)
+        if template_path.is_absolute() or ".." in template_path.parts:
+            raise WorkflowValidationError(
+                f"{location}.template must be a workflow-relative path without '..'"
+            )
+
+        threshold = self._require_bounded_number(
+            data.get("threshold", 0.8), f"{location}.threshold", 0.0, 1.0
+        )
+        ambiguity_margin = self._require_bounded_number(
+            data.get("ambiguity_margin", 0.02),
+            f"{location}.ambiguity_margin",
+            0.0,
+            1.0,
+        )
+        raw_scales = data.get("scales", [1.0])
+        if not isinstance(raw_scales, list) or not raw_scales or len(raw_scales) > 20:
+            raise WorkflowValidationError(
+                f"{location}.scales must be a non-empty list with at most 20 values"
+            )
+        scales = tuple(
+            self._require_bounded_number(
+                scale, f"{location}.scales[{index}]", 0.1, 4.0
+            )
+            for index, scale in enumerate(raw_scales)
+        )
+        if len(set(scales)) != len(scales):
+            raise WorkflowValidationError(f"{location}.scales must not contain duplicates")
+        return {
+            "type": "image",
+            "template": template,
+            "threshold": threshold,
+            "scales": scales,
+            "ambiguity_margin": ambiguity_margin,
         }
 
     def _load_selector_part(
@@ -320,6 +382,21 @@ class WorkflowLoader:
         if not isinstance(value, str):
             raise WorkflowValidationError(f"{location} must be a string")
         return value
+
+    @staticmethod
+    def _require_bounded_number(
+        value: Any, location: str, minimum: float, maximum: float
+    ) -> float:
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or not minimum <= value <= maximum
+        ):
+            raise WorkflowValidationError(
+                f"{location} must be a finite number from {minimum} to {maximum}"
+            )
+        return float(value)
 
     @staticmethod
     def _reject_unknown_fields(

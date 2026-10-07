@@ -1,7 +1,8 @@
 """Built-in actions for the current Automation Hub milestone."""
 
+from automation.actions.click import ClickAction
 from automation.actions.launch import LaunchAction
-from automation.actions.uia import ClickAction, CloseWindowAction, TypeTextAction
+from automation.actions.uia import CloseWindowAction, TypeTextAction
 from automation.actions.wait import WaitAction
 from automation.engine.registry import ActionRegistry
 

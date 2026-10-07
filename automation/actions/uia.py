@@ -17,20 +17,6 @@ def _uia_element(target: Any | None) -> Any:
     return target.element
 
 
-class ClickAction:
-    def execute(
-        self, step: Step, context: ExecutionContext, target: Any | None = None
-    ) -> ActionResult:
-        element = _uia_element(target)
-        try:
-            element.iface_invoke.Invoke()
-        except AttributeError as exc:
-            raise ActionFailed("Resolved UIA target does not support Invoke") from exc
-        return ActionResult.executed_unverified(
-            "Invoked UIA target", metadata=dict(target.metadata)
-        )
-
-
 class TypeTextAction:
     def execute(
         self, step: Step, context: ExecutionContext, target: Any | None = None
