@@ -11,8 +11,9 @@ from automation.engine.cancellation import CancellationToken
 
 
 class ExecutionStatus(str, Enum):
-    """Terminal state for an action, step, or workflow in Milestone 1."""
+    """Terminal state for an action, step, or workflow."""
 
+    VERIFIED = "verified"
     EXECUTED_UNVERIFIED = "executed_unverified"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -24,6 +25,8 @@ class Step:
     action: str
     parameters: Mapping[str, Any] = field(default_factory=dict)
     name: str | None = None
+    target: Mapping[str, Any] | None = None
+    expectation: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +41,20 @@ class Workflow:
 class ExecutionContext:
     cancellation: CancellationToken = field(default_factory=CancellationToken)
     working_directory: Path | None = None
+    processes: dict[str, "ProcessReference"] = field(default_factory=dict)
+    runtime_state: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class ProcessReference:
+    alias: str
+    starter_pid: int
+    program: str
+    bound_pid: int | None = None
+
+    @property
+    def pid(self) -> int:
+        return self.bound_pid or self.starter_pid
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +70,16 @@ class ActionResult:
     ) -> "ActionResult":
         return cls(
             ExecutionStatus.EXECUTED_UNVERIFIED,
+            message=message,
+            metadata=metadata or {},
+        )
+
+    @classmethod
+    def verified(
+        cls, message: str = "", *, metadata: Mapping[str, Any] | None = None
+    ) -> "ActionResult":
+        return cls(
+            ExecutionStatus.VERIFIED,
             message=message,
             metadata=metadata or {},
         )
@@ -99,3 +126,10 @@ class WorkflowResult:
     workflow_name: str
     status: ExecutionStatus
     steps: tuple[StepResult, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class VerificationResult:
+    passed: bool
+    message: str
+    metadata: Mapping[str, Any] = field(default_factory=dict)

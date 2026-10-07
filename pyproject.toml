@@ -20,6 +20,7 @@ dependencies = [
     "opencv-python>=4.8,<4.12",
     "PyDirectInput>=1,<2",
     "PyYAML>=6,<7",
+    "pywinauto==0.6.8",
 ]
 
 [project.optional-dependencies]
@@ -35,3 +36,6 @@ exclude = ["build*", "dist*", "tests*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+    "ui_integration: requires an interactive Windows desktop and installed target application",
+]

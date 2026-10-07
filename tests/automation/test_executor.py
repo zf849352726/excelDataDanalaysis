@@ -14,6 +14,7 @@ from automation.engine import (
     Step,
     Workflow,
     WorkflowExecutor,
+    VerificationResult,
 )
 
 
@@ -22,13 +23,17 @@ class RecordingAction:
         self.calls = calls
         self.result = result or ActionResult.executed_unverified()
 
-    def execute(self, step: Step, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, step: Step, context: ExecutionContext, target=None
+    ) -> ActionResult:
         self.calls.append(step.id)
         return self.result
 
 
 class RaisingAction:
-    def execute(self, step: Step, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, step: Step, context: ExecutionContext, target=None
+    ) -> ActionResult:
         raise RuntimeError("expected failure")
 
 
@@ -154,3 +159,70 @@ def test_waiting_launch_cancels_and_stops_its_owned_process() -> None:
     assert not thread.is_alive()
     assert results[0].status is ExecutionStatus.CANCELLED
     assert results[0].steps[0].result.metadata["pid"] > 0
+
+
+class StaticResolver:
+    def __init__(self, target) -> None:
+        self.target = target
+        self.began = False
+
+    def begin(self, context: ExecutionContext) -> None:
+        self.began = True
+
+    def resolve(self, target, context: ExecutionContext):
+        return self.target
+
+
+class StaticVerificationService:
+    def __init__(self, passed: bool) -> None:
+        self.passed = passed
+
+    def verify(self, expectation, context, action_target) -> VerificationResult:
+        return VerificationResult(self.passed, "checked")
+
+
+def test_executor_reports_verified_only_after_expectation_passes() -> None:
+    calls: list[str] = []
+    registry = ActionRegistry()
+    registry.register("record", RecordingAction(calls))
+    resolver = StaticResolver(object())
+    executor = WorkflowExecutor(
+        registry,
+        target_resolver=resolver,
+        verification_service=StaticVerificationService(True),
+    )
+    workflow = workflow_with(
+        Step(
+            "verified",
+            "record",
+            target={"strategies": ()},
+            expectation={"type": "check"},
+        )
+    )
+
+    result = executor.execute(workflow)
+
+    assert resolver.began
+    assert result.status is ExecutionStatus.VERIFIED
+    assert result.steps[0].status is ExecutionStatus.VERIFIED
+
+
+def test_executor_exposes_verification_failure_and_stops() -> None:
+    calls: list[str] = []
+    registry = ActionRegistry()
+    registry.register("record", RecordingAction(calls))
+    executor = WorkflowExecutor(
+        registry,
+        target_resolver=StaticResolver(object()),
+        verification_service=StaticVerificationService(False),
+    )
+    workflow = workflow_with(
+        Step("unmet", "record", expectation={"type": "check"}),
+        Step("must_not_run", "record"),
+    )
+
+    result = executor.execute(workflow)
+
+    assert calls == ["unmet"]
+    assert result.status is ExecutionStatus.FAILED
+    assert result.steps[0].result.error_type == "VerificationFailed"

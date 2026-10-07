@@ -7,6 +7,7 @@ from automation.engine import (
     CancellationToken,
     ExecutionContext,
     ExecutionStatus,
+    ProcessReference,
     Step,
     StepResult,
     Workflow,
@@ -15,6 +16,7 @@ from automation.engine import (
     WorkflowResult,
     WorkflowValidationError,
 )
+from automation.runtime import create_default_executor
 
 __all__ = [
     "ActionRegistry",
@@ -22,6 +24,7 @@ __all__ = [
     "CancellationToken",
     "ExecutionContext",
     "ExecutionStatus",
+    "ProcessReference",
     "Step",
     "StepResult",
     "Workflow",
@@ -30,4 +33,5 @@ __all__ = [
     "WorkflowResult",
     "WorkflowValidationError",
     "create_default_registry",
+    "create_default_executor",
 ]

@@ -1,0 +1,62 @@
+name: notepad_uia
+version: 1
+
+steps:
+  - id: launch_test_document
+    action: launch
+    program: notepad.exe
+    args: ["assets\\automation_hub_m2.txt"]
+    wait_for_exit: false
+    process_alias: notepad_m2
+    expect:
+      type: uia_exists
+      target:
+        strategies:
+          - type: uia
+            process: notepad_m2
+            allow_process_handoff: true
+            window:
+              title_contains: automation_hub_m2.txt
+              class_name: Notepad
+            control:
+              control_type: Document
+              class_name: RichEditD2DPT
+
+  - id: type_test_text
+    action: type_text
+    text: Hello Automation Hub
+    target:
+      strategies:
+        - type: uia
+          process: notepad_m2
+          window:
+            title_contains: automation_hub_m2.txt
+            class_name: Notepad
+          control:
+            control_type: Document
+            class_name: RichEditD2DPT
+    expect:
+      type: uia_text_equals
+      value: Hello Automation Hub
+
+  - id: close_test_tab
+    action: click
+    target:
+      strategies:
+        - type: uia
+          process: notepad_m2
+          window:
+            title_contains: automation_hub_m2.txt
+            class_name: Notepad
+          control:
+            control_type: Button
+            automation_id: CloseButton
+    expect:
+      type: uia_disappeared
+      target:
+        strategies:
+          - type: uia
+            process: notepad_m2
+            window:
+              title_contains: automation_hub_m2.txt
+              class_name: Notepad

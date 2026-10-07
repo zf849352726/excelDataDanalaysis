@@ -5,18 +5,32 @@ from __future__ import annotations
 import subprocess
 from typing import Any
 
-from automation.engine.models import ActionResult, ExecutionContext, Step
+from automation.engine.models import (
+    ActionResult,
+    ExecutionContext,
+    ProcessReference,
+    Step,
+)
 
 
 class LaunchAction:
     _POLL_INTERVAL_SECONDS = 0.05
     _TERMINATE_TIMEOUT_SECONDS = 2.0
 
-    def execute(self, step: Step, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, step: Step, context: ExecutionContext, target: Any | None = None
+    ) -> ActionResult:
         program = step.parameters["program"]
         args = step.parameters["args"]
         wait_for_exit = step.parameters["wait_for_exit"]
+        process_alias = step.parameters.get("process_alias")
         command = [program, *args]
+
+        if process_alias and process_alias in context.processes:
+            return ActionResult.failed(
+                f"Process alias '{process_alias}' is already in use",
+                error_type="ActionFailed",
+            )
 
         try:
             process = subprocess.Popen(
@@ -32,6 +46,13 @@ class LaunchAction:
             )
 
         metadata: dict[str, Any] = {"pid": process.pid, "program": program}
+        if process_alias:
+            context.processes[process_alias] = ProcessReference(
+                alias=process_alias,
+                starter_pid=process.pid,
+                program=program,
+            )
+            metadata["process_alias"] = process_alias
         if not wait_for_exit:
             return ActionResult.executed_unverified(
                 f"Launched '{program}'", metadata=metadata

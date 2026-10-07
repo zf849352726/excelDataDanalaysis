@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol
 
 from automation.engine.errors import ActionRegistrationError, UnknownActionError
 from automation.engine.models import ActionResult, ExecutionContext, Step
 
 
 class Action(Protocol):
-    def execute(self, step: Step, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, step: Step, context: ExecutionContext, target: Any | None = None
+    ) -> ActionResult:
         """Execute one narrowly scoped operation."""
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -13,11 +14,24 @@ from automation.engine.models import Step, Workflow
 
 
 _WORKFLOW_FIELDS = {"name", "version", "steps"}
-_COMMON_STEP_FIELDS = {"id", "name", "action"}
+_COMMON_STEP_FIELDS = {"id", "name", "action", "target", "expect"}
 _ACTION_FIELDS = {
     "wait": {"seconds"},
-    "launch": {"program", "args", "wait_for_exit"},
+    "launch": {"program", "args", "wait_for_exit", "process_alias"},
+    "click": set(),
+    "type_text": {"text"},
+    "close_window": set(),
 }
+_TARGET_ACTIONS = {"click", "type_text", "close_window"}
+_UIA_STRATEGY_FIELDS = {
+    "type",
+    "process",
+    "allow_process_handoff",
+    "window",
+    "control",
+}
+_UIA_WINDOW_FIELDS = {"title", "title_contains", "title_regex", "class_name"}
+_UIA_CONTROL_FIELDS = {"control_type", "name", "automation_id", "class_name"}
 
 
 class WorkflowLoader:
@@ -83,12 +97,41 @@ class WorkflowLoader:
         if name is not None:
             name = self._require_non_empty_string(name, f"{location}.name")
 
-        if action_name == "wait":
-            parameters = self._load_wait_parameters(data, location)
-        else:
-            parameters = self._load_launch_parameters(data, location)
+        parameters = self._load_action_parameters(action_name, data, location)
+        target = self._load_optional_target(data.get("target"), f"{location}.target")
+        if action_name in _TARGET_ACTIONS and target is None:
+            raise WorkflowValidationError(
+                f"{location}.target is required for action '{action_name}'"
+            )
+        if action_name not in _TARGET_ACTIONS and target is not None:
+            raise WorkflowValidationError(
+                f"{location}.target is not supported for action '{action_name}'"
+            )
 
-        return Step(id=step_id, name=name, action=action_name, parameters=parameters)
+        expectation = self._load_optional_expectation(
+            data.get("expect"), f"{location}.expect", target is not None
+        )
+        return Step(
+            id=step_id,
+            name=name,
+            action=action_name,
+            parameters=parameters,
+            target=target,
+            expectation=expectation,
+        )
+
+    def _load_action_parameters(
+        self, action_name: str, data: Mapping[str, Any], location: str
+    ) -> dict[str, Any]:
+        if action_name == "wait":
+            return self._load_wait_parameters(data, location)
+        if action_name == "launch":
+            return self._load_launch_parameters(data, location)
+        if action_name == "type_text":
+            return {
+                "text": self._require_string(data.get("text"), f"{location}.text")
+            }
+        return {}
 
     def _load_wait_parameters(
         self, data: Mapping[str, Any], location: str
@@ -121,11 +164,142 @@ class WorkflowLoader:
                 f"{location}.wait_for_exit must be a boolean"
             )
 
+        process_alias = data.get("process_alias")
+        if process_alias is not None:
+            process_alias = self._require_non_empty_string(
+                process_alias, f"{location}.process_alias"
+            )
+
         return {
             "program": program,
             "args": tuple(args),
             "wait_for_exit": wait_for_exit,
+            "process_alias": process_alias,
         }
+
+    def _load_optional_target(
+        self, value: Any, location: str
+    ) -> Mapping[str, Any] | None:
+        if value is None:
+            return None
+        data = self._require_mapping(value, location)
+        self._reject_unknown_fields(data, {"strategies"}, location)
+        strategies = data.get("strategies")
+        if not isinstance(strategies, list) or not strategies:
+            raise WorkflowValidationError(f"{location}.strategies must be a non-empty list")
+        return {
+            "strategies": tuple(
+                self._load_uia_strategy(strategy, f"{location}.strategies[{index}]")
+                for index, strategy in enumerate(strategies)
+            )
+        }
+
+    def _load_uia_strategy(self, value: Any, location: str) -> Mapping[str, Any]:
+        data = self._require_mapping(value, location)
+        self._reject_unknown_fields(data, _UIA_STRATEGY_FIELDS, location)
+        strategy_type = self._require_non_empty_string(
+            data.get("type"), f"{location}.type"
+        )
+        if strategy_type != "uia":
+            raise WorkflowValidationError(
+                f"{location}.type '{strategy_type}' is unsupported in Milestone 2"
+            )
+        process = self._require_non_empty_string(
+            data.get("process"), f"{location}.process"
+        )
+        allow_handoff = data.get("allow_process_handoff", False)
+        if not isinstance(allow_handoff, bool):
+            raise WorkflowValidationError(
+                f"{location}.allow_process_handoff must be a boolean"
+            )
+
+        window = self._load_selector_part(
+            data.get("window"), _UIA_WINDOW_FIELDS, f"{location}.window"
+        )
+        if window is None:
+            raise WorkflowValidationError(f"{location}.window is required")
+        if "title_regex" in window:
+            try:
+                re.compile(window["title_regex"])
+            except re.error as exc:
+                raise WorkflowValidationError(
+                    f"{location}.window.title_regex is invalid: {exc}"
+                ) from exc
+
+        control = self._load_selector_part(
+            data.get("control"), _UIA_CONTROL_FIELDS, f"{location}.control"
+        )
+        if allow_handoff and not any(
+            key in window for key in ("title", "title_contains", "title_regex")
+        ):
+            raise WorkflowValidationError(
+                f"{location}.window requires a title constraint when process handoff is allowed"
+            )
+
+        return {
+            "type": "uia",
+            "process": process,
+            "allow_process_handoff": allow_handoff,
+            "window": window,
+            "control": control,
+        }
+
+    def _load_selector_part(
+        self, value: Any, allowed: set[str], location: str
+    ) -> Mapping[str, str] | None:
+        if value is None:
+            return None
+        data = self._require_mapping(value, location)
+        self._reject_unknown_fields(data, allowed, location)
+        if not data:
+            raise WorkflowValidationError(f"{location} must not be empty")
+        return {
+            key: self._require_non_empty_string(item, f"{location}.{key}")
+            for key, item in data.items()
+        }
+
+    def _load_optional_expectation(
+        self, value: Any, location: str, has_action_target: bool
+    ) -> Mapping[str, Any] | None:
+        if value is None:
+            return None
+        data = self._require_mapping(value, location)
+        expectation_type = self._require_non_empty_string(
+            data.get("type"), f"{location}.type"
+        )
+        allowed_by_type = {
+            "uia_exists": {"type", "target"},
+            "uia_text_equals": {"type", "target", "value"},
+            "uia_disappeared": {"type", "target"},
+        }
+        allowed = allowed_by_type.get(expectation_type)
+        if allowed is None:
+            supported = ", ".join(sorted(allowed_by_type))
+            raise WorkflowValidationError(
+                f"{location}.type '{expectation_type}' is unsupported; "
+                f"supported expectations: {supported}"
+            )
+        self._reject_unknown_fields(data, allowed, location)
+
+        target = self._load_optional_target(data.get("target"), f"{location}.target")
+        if expectation_type in {"uia_exists", "uia_disappeared"} and target is None:
+            raise WorkflowValidationError(
+                f"{location}.target is required for '{expectation_type}'"
+            )
+        if expectation_type == "uia_text_equals" and target is None and not has_action_target:
+            raise WorkflowValidationError(
+                f"{location} requires a target because the action has no target"
+            )
+
+        expectation: dict[str, Any] = {
+            "type": expectation_type,
+            "target": target,
+        }
+        if expectation_type == "uia_text_equals":
+            expectation["value"] = self._require_string(
+                data.get("value"), f"{location}.value"
+            )
+        return expectation
 
     @staticmethod
     def _require_mapping(value: Any, location: str) -> Mapping[str, Any]:
@@ -139,6 +313,12 @@ class WorkflowLoader:
     def _require_non_empty_string(value: Any, location: str) -> str:
         if not isinstance(value, str) or not value.strip():
             raise WorkflowValidationError(f"{location} must be a non-empty string")
+        return value
+
+    @staticmethod
+    def _require_string(value: Any, location: str) -> str:
+        if not isinstance(value, str):
+            raise WorkflowValidationError(f"{location} must be a string")
         return value
 
     @staticmethod

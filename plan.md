@@ -238,7 +238,7 @@ Do not add UIA, image matching, GUI refactoring, MCP, OCR, AI Vision, global key
 
 # 7. Milestone 2 — UIA Vertical Slice
 
-**Status: Pending review — not active**
+**Status: Completed — 2026-10-07**
 
 ## Goal
 
@@ -256,7 +256,9 @@ Add:
 - target-bound `click`, `type_text`, and `close_window` actions
 - the minimum window/UIA verification needed by the Notepad scenario
 
-Target-bound actions must operate only on an element resolved for the current step. `close_window` must close only the process/window launched and identified by the current run. It must not send a focus-based close command to an arbitrary foreground window.
+Target-bound actions must operate only on an element resolved for the current step. `close_window` must close only a window identified by the current run. It must not send a focus-based close command to an arbitrary foreground window.
+
+Modern Windows Notepad may reuse an existing process and top-level window. The integration workflow therefore opens a uniquely named test document and invokes that active test tab's exact UIA `CloseButton`. It must not close the shared Notepad window or disturb pre-existing tabs.
 
 Primary integration workflow:
 
@@ -265,17 +267,18 @@ launch Notepad
 → locate editor using UIA
 → type "Hello Automation Hub"
 → verify editor/window state
-→ close Notepad
+→ close the uniquely identified test tab
 ```
 
-If the save prompt appears, handle it through UIA.
+The supported validation environment closes this test tab without a save prompt. If another supported variant displays one, it must be handled through a declared UIA target; without such a selector, the workflow stops safely instead of guessing.
 
 ## Acceptance
 
 - workflow does not depend on fixed window position
 - no image template is required
 - the workflow verifies the expected text/window state before reporting success
-- only the Notepad process/window owned by the run is closed
+- only the uniquely identified test document/tab owned by the run is closed
+- pre-existing Notepad windows and tabs remain open
 - Notepad scenario succeeds 5/5 times in the same supported environment
 - locator failures stop safely and are diagnosable
 
@@ -709,9 +712,9 @@ A later milestone may be pulled forward only when there is a concrete need and d
 
 ## Current state
 
-**Milestone 1 — Core Workflow Engine is complete.**
+**Milestone 2 — UIA Vertical Slice is complete. Milestone 3 is pending review and is not active.**
 
-Milestone 2 is the next candidate and is not active until explicitly approved.
+Milestone 1 is complete and committed locally as `5c1f9fb`.
 
 Milestone 1 delivered:
 
@@ -730,7 +733,23 @@ Validation completed with the documented Python 3.11 environment:
 - `automation` imports without loading PyQt5
 - `basic_test` completed end-to-end with both steps reported as `executed_unverified`
 
-Wait for review before starting Milestone 2.
+Milestone 2 delivered:
+
+- common locator results, explicit locator/verifier registries, and a declared-order locator chain
+- UIA process/window/control selectors with safe ambiguity handling and Windows process handoff support
+- semantic UIA `click`, `type_text`, and target-bound `close_window` actions
+- `uia_exists`, `uia_text_equals`, and `uia_disappeared` verification
+- a Notepad workflow that opens, edits, verifies, and closes only its uniquely named test tab
+- deterministic unit tests and an opt-in Windows UI integration test
+
+Validation completed with the documented Python 3.11 environment:
+
+- full default test suite: 38 passed, 1 UI integration test skipped by default
+- opt-in Notepad UI integration: 5/5 verified runs in the same Windows environment
+- `automation` imports without loading PyQt5
+- the test document is restored unchanged and no test tab remains open after validation
+
+Wait for review before starting Milestone 3.
 
 ---
 

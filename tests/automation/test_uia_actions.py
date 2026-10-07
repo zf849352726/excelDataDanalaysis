@@ -1,0 +1,86 @@
+from types import SimpleNamespace
+
+import pytest
+
+from automation.actions.uia import ClickAction, CloseWindowAction, TypeTextAction
+from automation.engine import ActionFailed, ExecutionContext, ExecutionStatus, Step
+from automation.locators import LocatorResult
+
+
+class FakeInvoke:
+    def __init__(self) -> None:
+        self.called = False
+
+    def Invoke(self) -> None:
+        self.called = True
+
+
+class FakeValue:
+    def __init__(self) -> None:
+        self.CurrentValue = ""
+
+    def SetValue(self, value: str) -> None:
+        self.CurrentValue = value
+
+
+class FakeElement:
+    def __init__(self, control_type: str) -> None:
+        self.element_info = SimpleNamespace(control_type=control_type)
+        self.iface_invoke = FakeInvoke()
+        self.iface_value = FakeValue()
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def target_for(element: FakeElement) -> LocatorResult:
+    return LocatorResult(
+        True,
+        "uia",
+        element=element,
+        metadata={"automation_id": "target"},
+    )
+
+
+def test_click_uses_semantic_invoke() -> None:
+    element = FakeElement("Button")
+
+    result = ClickAction().execute(
+        Step("click", "click"), ExecutionContext(), target_for(element)
+    )
+
+    assert element.iface_invoke.called
+    assert result.status is ExecutionStatus.EXECUTED_UNVERIFIED
+
+
+def test_type_text_uses_semantic_set_value() -> None:
+    element = FakeElement("Document")
+
+    result = TypeTextAction().execute(
+        Step("type", "type_text", {"text": "Hello"}),
+        ExecutionContext(),
+        target_for(element),
+    )
+
+    assert element.iface_value.CurrentValue == "Hello"
+    assert result.metadata["text_length"] == 5
+
+
+def test_close_window_requires_window_target() -> None:
+    with pytest.raises(ActionFailed, match="Window"):
+        CloseWindowAction().execute(
+            Step("close", "close_window"),
+            ExecutionContext(),
+            target_for(FakeElement("Button")),
+        )
+
+
+def test_close_window_closes_only_resolved_window() -> None:
+    element = FakeElement("Window")
+
+    CloseWindowAction().execute(
+        Step("close", "close_window"), ExecutionContext(), target_for(element)
+    )
+
+    assert element.closed
